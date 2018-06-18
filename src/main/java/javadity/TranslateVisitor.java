@@ -161,13 +161,13 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	try {
 	    ctx.functionCallArguments().expressionList().expression().stream()
-		.forEach(elt ->  arguments.add((Expression) this.visit(elt)));
+		.forEach(elt -> arguments.add((Expression) this.visit(elt)));
 	}
 	finally {}
 
-	SimpleName method = ((NameExpr) this.visit(ctx.expression())).getName(); // Only NameExpr here
+	NameExpr method = (NameExpr) this.visit(ctx.expression());
 
-	return new MethodCallExpr(null, method, arguments);
+	return new MethodCallExpr(null, method.getName(), arguments);
     }
     
     @Override
@@ -214,8 +214,9 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     public Node visitDotExpression(SolidityParser.DotExpressionContext ctx) { // TODO: Is this right?
 	Expression expr = (Expression) this.visit(ctx.expression());
 	SimpleName identifier = (SimpleName) this.visit(ctx.identifier());
+	Name name = new Name(new Name(expr.toString()), identifier.asString());
 
-	return new FieldAccessExpr(expr, identifier.asString());
+	return new NameExpr(name.asString());
     }
 
     @Override
@@ -254,6 +255,8 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	
 	return null; // This should never happen
     }
+
+    /* CONTRACT PARTS */
 
     @Override
     public Node visitFunctionDefinition(SolidityParser.FunctionDefinitionContext ctx) {
