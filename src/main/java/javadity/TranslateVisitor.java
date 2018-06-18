@@ -290,6 +290,19 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     /* STATEMENT */
 
     @Override
+    public Node visitReturnStatement(SolidityParser.ReturnStatementContext ctx) {
+	ReturnStmt value;
+	if (ctx.expression() != null) {
+	    Expression expr = (Expression) this.visit(ctx.expression());
+	    value = new ReturnStmt(expr);
+	}
+	else
+	    value = new ReturnStmt();
+
+	return value;
+    }
+
+    @Override
     public Node visitBlock(SolidityParser.BlockContext ctx) {
 	NodeList<Statement> statements = new NodeList<>();
 	ctx.statement().stream()
