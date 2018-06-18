@@ -1,0 +1,7 @@
+*.interp
+*.tokens
+*~
+target
+*.sol
+src/main/java/javadity/Solidity*
+*.xml
