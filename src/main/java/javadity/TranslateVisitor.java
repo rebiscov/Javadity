@@ -163,7 +163,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    ctx.functionCallArguments().expressionList().expression().stream()
 		.forEach(elt -> arguments.add((Expression) this.visit(elt)));
 	}
-	finally {}
+	catch (Exception e) {}
 
 	NameExpr method = (NameExpr) this.visit(ctx.expression());
 
