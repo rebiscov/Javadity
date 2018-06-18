@@ -122,6 +122,8 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	return new FieldDeclaration(modifiers, new VariableDeclarator(type, id, expr));
     }
 
+    /* TYPE NAME */
+    
     @Override
     public Node visitElementaryTypeName(SolidityParser.ElementaryTypeNameContext ctx) {
 	// RE-DO THIS PLEASE!
@@ -142,6 +144,17 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	}
     }
 
+    @Override
+    public Node visitUserDefinedTypeName(SolidityParser.UserDefinedTypeNameContext ctx) {
+	List<String> identifiers= ctx.identifier().stream()
+	    .map(elt -> ((SimpleName) this.visit(elt)).asString())
+	    .collect(Collectors.toList());
+
+	return new ClassOrInterfaceType(null, String.join(".", identifiers));
+    }
+
+    /* EXPRESSION */
+    
     @Override
     public Node visitAdditiveExpression(SolidityParser.AdditiveExpressionContext ctx) {
 	Expression expr1 = (Expression) this.visit(ctx.expression(0));
@@ -180,6 +193,14 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	Expression expr2 = (Expression) this.visit(ctx.expression(1));
 
 	return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.OR);
+    }
+
+    @Override
+    public Node visitDotExpression(SolidityParser.DotExpressionContext ctx) { // TODO: Is this right?
+	Expression expr = (Expression) this.visit(ctx.expression());
+	SimpleName identifier = (SimpleName) this.visit(ctx.identifier());
+
+	return new FieldAccessExpr(expr, identifier.asString());
     }
 
     @Override
