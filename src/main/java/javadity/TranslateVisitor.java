@@ -116,6 +116,12 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	}
 	catch (java.lang.NullPointerException e){
 	    expr = null;
+
+	    if (!type.isPrimitiveType()) {
+		ClassOrInterfaceType clazz =
+		    new ClassOrInterfaceType(null, type.toString());
+		expr = new ObjectCreationExpr(null, clazz, new NodeList<Expression>());
+	    }
 	}
 	
 	
@@ -420,7 +426,16 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     
     @Override
     public Node visitVariableDeclaration(SolidityParser.VariableDeclarationContext ctx) {
-	return new VariableDeclarator((Type) this.visit(ctx.typeName()), (SimpleName) this.visit(ctx.identifier()));
+	VariableDeclarator var = new VariableDeclarator((Type) this.visit(ctx.typeName()), (SimpleName) this.visit(ctx.identifier()));
+
+	if (!var.getType().isPrimitiveType()) {
+	    ClassOrInterfaceType type = new ClassOrInterfaceType(null, var.getType().toString());
+	    ObjectCreationExpr expr = new ObjectCreationExpr(null, type, new NodeList<Expression>());
+
+	    var.setInitializer(expr);
+	}
+
+	return var;
     }
 
     @Override
