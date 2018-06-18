@@ -154,6 +154,21 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     }
 
     /* EXPRESSION */
+
+    @Override
+    public Node visitFunctionCallExpression(SolidityParser.FunctionCallExpressionContext ctx) {
+	NodeList<Expression> arguments = new NodeList<>();
+
+	try {
+	    ctx.functionCallArguments().expressionList().expression().stream()
+		.forEach(elt ->  arguments.add((Expression) this.visit(elt)));
+	}
+	finally {}
+
+	SimpleName method = ((NameExpr) this.visit(ctx.expression())).getName(); // Only NameExpr here
+
+	return new MethodCallExpr(null, method, arguments);
+    }
     
     @Override
     public Node visitAdditiveExpression(SolidityParser.AdditiveExpressionContext ctx) {
