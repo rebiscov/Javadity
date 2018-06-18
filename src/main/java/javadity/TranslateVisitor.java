@@ -129,7 +129,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	// RE-DO THIS PLEASE!
 
 	if (ctx.Int() != null || ctx.Uint() != null)
-	    return new ClassOrInterfaceType(null, "Uint256");
+	    return new ClassOrInterfaceType(null, "Uint256BigInteger");
 	
 	switch (ctx.getText()) {
 	case "address":
@@ -139,7 +139,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	case "string":
 	    return new ClassOrInterfaceType(null, "String");
 	default:
-	    return new ClassOrInterfaceType(null, "Uint256");
+	    return new ClassOrInterfaceType(null, "Uint256BigInteger");
 
 	}
     }
@@ -174,11 +174,16 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     public Node visitAdditiveExpression(SolidityParser.AdditiveExpressionContext ctx) {
 	Expression expr1 = (Expression) this.visit(ctx.expression(0));
 	Expression expr2 = (Expression) this.visit(ctx.expression(1));
+	
+	NodeList<Expression> parameters = new NodeList<>(expr2);
+	SimpleName op;
 
 	if (ctx.binop.getType() == SolidityParser.PLUS)
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.PLUS);
+	    op = new SimpleName("sum");
 	else
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.MINUS);
+	    op = new SimpleName("sub");
+
+	return new MethodCallExpr(expr1, op, parameters);
     }
 
     @Override
@@ -186,12 +191,17 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	Expression expr1 = (Expression) this.visit(ctx.expression(0));
 	Expression expr2 = (Expression) this.visit(ctx.expression(1));
 
+	NodeList<Expression> parameters = new NodeList<>(expr2);
+	SimpleName op;
+
 	if (ctx.binop.getType() == SolidityParser.MULT)
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.MULTIPLY);
+	    op = new SimpleName("mul");
 	else if (ctx.binop.getType() == SolidityParser.DIV)
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.DIVIDE);
+	    op = new SimpleName("div");
 	else
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.REMAINDER);
+	    op = new SimpleName("mod");
+
+	return new MethodCallExpr(expr1, op, parameters);
     }
 
     @Override
@@ -222,7 +232,11 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     @Override
     public Node visitNumberLiteral(SolidityParser.NumberLiteralContext ctx) {
 	// We treat only integers TODO: use NumberUnit and HexNumber (see grammar)
-	return new IntegerLiteralExpr(ctx.DecimalNumber().getText());
+	ClassOrInterfaceType type = new ClassOrInterfaceType(null, "Uint256BigInteger");
+	NodeList<Expression> integer = new NodeList<>();
+	integer.add(new IntegerLiteralExpr(ctx.DecimalNumber().getText()));
+
+	return new ObjectCreationExpr(null, type, integer);
     }
 
     @Override
@@ -241,19 +255,21 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     public Node visitCompExpression(SolidityParser.CompExpressionContext ctx) {
 	Expression expr1 = (Expression) this.visit(ctx.expression(0));
 	Expression expr2 = (Expression) this.visit(ctx.expression(1));
+
+	NodeList<Expression> parameters = new NodeList<>(expr2);
+	SimpleName op;
 	
 	if (ctx.binop.getText().equals("<"))
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.LESS);
+	    op = new SimpleName("le");
 	else if (ctx.binop.getText().equals(">"))
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.GREATER);
+	    op = new SimpleName("gr");
 	else if (ctx.binop.getText().equals("<="))
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.LESS_EQUALS);
-	else if (ctx.binop.getText().equals(">="))
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.GREATER_EQUALS);
+	    op = new SimpleName("leq");
+	else 
+	    op = new SimpleName("geq");
 
-	System.out.println("WARNING: visitCompExpression returned nothing");
 	
-	return null; // This should never happen
+	return new MethodCallExpr(expr1, op, parameters);
     }
 
     /* CONTRACT PARTS */
