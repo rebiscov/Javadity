@@ -163,7 +163,12 @@ statement
   | returnStatement
   | throwStatement
   | emitStatement
-  | simpleStatement ;
+  | simpleStatement
+  | placeHolderStatement
+  ;
+
+placeHolderStatement
+  : PLACEHOLDER ';' ;
 
 expressionStatement
   : expression ';' ;
@@ -465,6 +470,8 @@ BOR : '|';
 NOT : '!';
 INC : '++';
 DEC : '--';
+
+PLACEHOLDER : '_';
 
 WS
   : [ \t\r\n\u000C]+ -> skip ;

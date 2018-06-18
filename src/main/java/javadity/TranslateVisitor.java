@@ -220,6 +220,26 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	return this.visitChildren(ctx);
     }
 
+    
+    @Override
+    public Node visitCompExpression(SolidityParser.CompExpressionContext ctx) {
+	Expression expr1 = (Expression) this.visit(ctx.expression(0));
+	Expression expr2 = (Expression) this.visit(ctx.expression(1));
+	
+	if (ctx.binop.getText().equals("<"))
+	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.LESS);
+	else if (ctx.binop.getText().equals(">"))
+	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.GREATER);
+	else if (ctx.binop.getText().equals("<="))
+	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.LESS_EQUALS);
+	else if (ctx.binop.getText().equals(">="))
+	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.GREATER_EQUALS);
+
+	System.out.println("WARNING: visitCompExpression returned nothing");
+	
+	return null; // This should never happen
+    }
+
     @Override
     public Node visitFunctionDefinition(SolidityParser.FunctionDefinitionContext ctx) {
 	// Identifier
@@ -258,7 +278,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	// MethodDeclaration
 	MethodDeclaration method = new MethodDeclaration(modifiers, id, returnedType, javaParameterList);
-	
+
 	// Get block
 	BlockStmt block = (BlockStmt) this.visit(ctx.block());
 	method.setBody(block);
@@ -266,6 +286,8 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	
 	return method;
     }
+
+    /* STATEMENT */
 
     @Override
     public Node visitBlock(SolidityParser.BlockContext ctx) {
@@ -348,24 +370,6 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	return null; // This should never happen
     }
 
-    @Override
-    public Node visitCompExpression(SolidityParser.CompExpressionContext ctx) {
-	Expression expr1 = (Expression) this.visit(ctx.expression(0));
-	Expression expr2 = (Expression) this.visit(ctx.expression(1));
-	
-	if (ctx.binop.getText().equals("<"))
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.LESS);
-	else if (ctx.binop.getText().equals(">"))
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.GREATER);
-	else if (ctx.binop.getText().equals("<="))
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.LESS_EQUALS);
-	else if (ctx.binop.getText().equals(">="))
-	    return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.GREATER_EQUALS);
-
-	System.out.println("WARNING: visitCompExpression returned nothing");
-	
-	return null; // This should never happen
-    }
     
     @Override
     public Node visitVariableDeclaration(SolidityParser.VariableDeclarationContext ctx) {
