@@ -278,6 +278,24 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	return new MethodCallExpr(expr1, op, parameters);
     }
 
+    @Override
+    public Node visitEqualityExpression(SolidityParser.EqualityExpressionContext ctx) {
+	Expression expr1 = (Expression) this.visit(ctx.expression(0));
+	Expression expr2 = (Expression) this.visit(ctx.expression(1));
+
+	NodeList<Expression> parameters = new NodeList<>(expr2);
+	SimpleName op;
+	
+	if (ctx.binop.getText().equals("=="))
+	    op = new SimpleName("equals");
+	else 
+	    op = new SimpleName("notEquals");
+
+	
+	return new MethodCallExpr(expr1, op, parameters);
+    }
+
+
     /* CONTRACT PARTS */
 
     @Override

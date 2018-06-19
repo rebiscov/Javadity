@@ -253,7 +253,7 @@ expression
   | expression '^' expression				#bitwiseXorExpression
   | expression '|' expression				#bitwiseOrExpression
   | expression binop=('<' | '>' | '<=' | '>=') expression	#compExpression
-  | expression ('==' | '!=') expression			#equalityExpression
+  | expression binop=('==' | '!=') expression		#equalityExpression
   | expression '&&' expression				#andExpression
   | expression '||' expression				#orExpression
   | expression '?' expression ':' expression		#ternaryExpression
