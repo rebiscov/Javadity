@@ -6,6 +6,7 @@ import com.github.javaparser.ast.stmt.*;
 import com.github.javaparser.ast.modules.*;
 
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.ParserRuleContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +18,8 @@ class Helper {
 }
 
 public class TranslateVisitor extends SolidityBaseVisitor<Node> {
+    private HashMap<String, SolidityModifier> modifiersMap = new HashMap<>();
+    
     @Override
     public Node visitSourceUnit(SolidityParser.SourceUnitContext ctx) {
 	NodeList contractsList = new NodeList();
@@ -71,6 +74,25 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitContractDefinition(SolidityParser.ContractDefinitionContext ctx) {
+	List<SolidityParser.ContractPartContext>  contractPartList = ctx.contractPart();
+	
+	// Record all the user defined modifiers
+	contractPartList.stream()
+	    .map(elt -> elt.modifierDefinition())
+	    .filter(elt -> elt != null) // Only keep the definitions of a modifier
+	    .forEach(elt -> { // Put the modifiers in the mapping
+		    String name = elt.identifier().getText();
+		    ParserRuleContext code = elt.block();
+		    List<String> parameters = elt.parameterList().parameter().stream()
+			.map(e -> e.identifier().getText())
+			.collect(Collectors.toList());
+
+		    SolidityModifier modifier = new SolidityModifier(name, code, new ArrayList(parameters));
+
+		    modifiersMap.put(name, modifier);
+		});
+
+
 	// Identifier
 	String id = ((SimpleName)this.visit(ctx.identifier())).asString();
 	
@@ -81,10 +103,9 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	ctx.inheritanceSpecifier().stream()
 	    .forEach(elt -> type.addExtendedType(elt.userDefinedTypeName().getText()));
 
-	List<SolidityParser.ContractPartContext>  contractPartList = ctx.contractPart();
-
 	// Add the members
 	contractPartList.stream()
+	    .filter(elt ->  elt.modifierDefinition() == null ) // Do not take the modifiers
 	    .forEach(elt -> type.addMember((BodyDeclaration) this.visit(elt)));
 
 
@@ -313,6 +334,35 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	if (!modList.PrivateKeyword().isEmpty() || !modList.InternalKeyword().isEmpty())
 	    modifiers = EnumSet.of(Modifier.PRIVATE);
+
+	// User defined modifiers
+	BlockStmt block = (BlockStmt) this.visit(ctx.block());
+	for (SolidityParser.ModifierInvocationContext mod: ctx.modifierList().modifierInvocation()) {
+	    String name = mod.identifier().getText();
+	    
+	    List<String> params;
+	    try {
+		params = new ArrayList(mod.expressionList().expression().stream()
+				       .map(elt -> elt.getText())
+				       .collect(Collectors.toList()));
+
+	    }
+	    catch (NullPointerException e) {
+		params = new ArrayList<String>();
+	    }
+
+
+	    SolidityModifier solMod = modifiersMap.get(name);
+
+	    HashMap<String, String> map = new HashMap<>();
+
+	    for (int i = 0; i < params.size(); i++)
+		map.put(solMod.parameters.get(i), params.get(i));
+
+	    TranslateModifierVisitor modVisitor = new TranslateModifierVisitor(map, block);
+
+	    block = (BlockStmt) modVisitor.visit(solMod.code);
+	}
 	    
 
 	// Parameters list
@@ -338,7 +388,6 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	MethodDeclaration method = new MethodDeclaration(modifiers, id, returnedType, javaParameterList);
 
 	// Get block
-	BlockStmt block = (BlockStmt) this.visit(ctx.block());
 	method.setBody(block);
 	
 	
@@ -469,4 +518,42 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	return new SimpleName(ctx.getText());
     }
     
+}
+
+class TranslateModifierVisitor extends TranslateVisitor {
+    private HashMap<String, String> map;
+    BlockStmt code;
+    
+
+    TranslateModifierVisitor(HashMap<String, String> map, BlockStmt code) {
+	super();
+	
+	this.map = map;
+	this.code = code;
+    }
+
+    @Override
+    public Node visitIdentifier(SolidityParser.IdentifierContext ctx) {
+	if (this.map.containsKey(ctx.getText()))
+	    return new SimpleName(map.get(ctx.getText()));
+	else
+	    return new SimpleName(ctx.getText());
+    }
+
+    @Override
+    public Node visitPlaceHolderStatement(SolidityParser.PlaceHolderStatementContext ctx) {
+	return this.code;
+    }
+}
+
+class SolidityModifier { // Class to represent a user defined Solidity modifier.
+    String name;
+    ParserRuleContext code;
+    ArrayList<String> parameters;
+
+    SolidityModifier(String name, ParserRuleContext code, ArrayList<String> parameters) {
+	this.name = name;
+	this.code = code;
+	this.parameters = parameters;
+    }
 }
