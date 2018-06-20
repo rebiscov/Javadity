@@ -18,15 +18,18 @@ class Helper {
 }
 
 public class TranslateVisitor extends SolidityBaseVisitor<Node> {
+    private static final String UINT = "Uint256BigInteger";
+    
     private HashMap<String, SolidityModifier> modifiersMap = new HashMap<>();
     
     @Override
     public Node visitSourceUnit(SolidityParser.SourceUnitContext ctx) {
-	NodeList contractsList = new NodeList();
-
+	
 	// Add all the contracts the list of contracts
-	for (SolidityParser.ContractDefinitionContext e: ctx.contractDefinition())
-	    contractsList.add(this.visit(e));
+	NodeList contractsList = new NodeList(ctx.contractDefinition().stream() // for all contracts...
+					      .map(elt -> this.visit(elt)) //..translate them in Java
+					      .collect(Collectors.toList())
+					      );
 
 	// Add all the contracts to the compilation unit
 	CompilationUnit cu = new CompilationUnit(null, new NodeList<ImportDeclaration>(), contractsList, null);
@@ -36,37 +39,62 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitStructDefinition(SolidityParser.StructDefinitionContext ctx) {
-	ClassOrInterfaceDeclaration type = new ClassOrInterfaceDeclaration(EnumSet.of(Modifier.PUBLIC), false, ((SimpleName) this.visit(ctx.identifier())).asString());
 
+	// Get the name of the structure
+	String structName = ((SimpleName) this.visit(ctx.identifier())).asString();
+
+	// Create a class for this structure
+	ClassOrInterfaceDeclaration type = new ClassOrInterfaceDeclaration(EnumSet.of(Modifier.PUBLIC),
+									   false, // Not an interface
+									   structName);
+
+	// Get all the fields to put in the structure
 	List<SolidityParser.VariableDeclarationContext> fieldList = ctx.variableDeclaration();
 	
-	// Add the variables
+	// Add the fields to the class 
 	fieldList.stream()
-	    .forEach(elt -> type.addMember(new FieldDeclaration(EnumSet.of(Modifier.PUBLIC) ,(VariableDeclarator) this.visit(elt))));
+	    .forEach(elt -> type.addMember(new FieldDeclaration(EnumSet.of(Modifier.PUBLIC),
+								(VariableDeclarator) this.visit(elt)
+								)));
 
 	return type;
     }
 
     @Override
     public Node visitEnumDefinition(SolidityParser.EnumDefinitionContext ctx) {
+	// The modifiers of an Enum are always public & static
 	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
 	modifiers.add(Modifier.STATIC);
-	
-	ClassOrInterfaceDeclaration type = new ClassOrInterfaceDeclaration(modifiers, false, ((SimpleName) this.visit(ctx.identifier())).asString());
 
-	List<SolidityParser.EnumValueContext> enumValues = ctx.enumValue();
-	List<String> IDs = enumValues.stream()
+	// Creation of the class that represents an Enum
+	String enumName = ((SimpleName) this.visit(ctx.identifier())).asString();
+	ClassOrInterfaceDeclaration type = new ClassOrInterfaceDeclaration(modifiers,
+									   false, // Not an interface
+									   enumName);
+	
+	// Get the enum IDs
+	List<String> IDs = ctx.enumValue().stream()
 	    .map(elt -> elt.getText())
 	    .collect(Collectors.toList());
 
-	Type t = PrimitiveType.intType();
-	NodeList<VariableDeclarator> values = new NodeList<>();
+	// Enum values will be represented as Uint256
+	ClassOrInterfaceType t = new ClassOrInterfaceType(null, UINT);
 	
+	NodeList<VariableDeclarator> values = new NodeList<>();
+
+	// For each ID, associate a number.
 	for (int i = 0; i < IDs.size(); i ++) {
-	    IntegerLiteralExpr expr = new IntegerLiteralExpr(i);
+	    // Create the value
+	    ObjectCreationExpr expr = new ObjectCreationExpr(null,
+							     t,
+							     NodeList.nodeList(new IntegerLiteralExpr(i)));
+	    
+	    // Associate the ID to the value
 	    VariableDeclarator var = new VariableDeclarator(t, IDs.get(i), expr);
 	    values.add(var);
 	}
+
+	// Add the declaration to the class
 	type.addMember(new FieldDeclaration(modifiers, values));
 
 	return type;
@@ -93,13 +121,13 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 		});
 
 
-	// Identifier
+	// Name of the contract
 	String id = ((SimpleName)this.visit(ctx.identifier())).asString();
 	
-	// Create a new class
+	// Create a new class representing the contract
 	ClassOrInterfaceDeclaration type = new ClassOrInterfaceDeclaration(EnumSet.of(Modifier.PUBLIC), false, id);
 
-	// Add the parent classes to the class
+	// Deal with inheritance
 	ctx.inheritanceSpecifier().stream()
 	    .forEach(elt -> type.addExtendedType(elt.userDefinedTypeName().getText()));
 
@@ -108,17 +136,16 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    .filter(elt ->  elt.modifierDefinition() == null ) // Do not take the modifiers
 	    .forEach(elt -> type.addMember((BodyDeclaration) this.visit(elt)));
 
-
 	return type;
     }
 
     @Override
     public Node visitStateVariableDeclaration(SolidityParser.StateVariableDeclarationContext ctx) {
 
-	// Type
+	// Type of the state variable
 	Type type = (Type) this.visit(ctx.typeName());
 	
-	// Modifier
+	// Get the modifier (public or private)
 	EnumSet modifiers = EnumSet.noneOf(Modifier.class);
 	if (!ctx.PublicKeyword().isEmpty())
 	    modifiers.add(Modifier.PUBLIC);
@@ -126,11 +153,11 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    modifiers.add(Modifier.PUBLIC);
 
 
-	// Identifier
+	// Identifier of the state variable
 	String id = ((SimpleName) this.visit(ctx.identifier())).asString();
 	
 
-	// Expression
+	// If it exists, get the expression that initialize the state variable
 	Expression expr;
 	try {
 	    expr = (Expression) this.visit(ctx.expression());
@@ -138,7 +165,9 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	catch (java.lang.NullPointerException e){
 	    expr = null;
 
-	    if (!type.isPrimitiveType()) {
+	    // If there is not initialization and it is not a primitive type then
+	    // put a default initialization
+	    if (!type.isPrimitiveType()) { 
 		ClassOrInterfaceType clazz =
 		    new ClassOrInterfaceType(null, type.toString());
 		expr = new ObjectCreationExpr(null, clazz, new NodeList<Expression>());
@@ -156,7 +185,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	// RE-DO THIS PLEASE!
 
 	if (ctx.Int() != null || ctx.Uint() != null)
-	    return new ClassOrInterfaceType(null, "Uint256BigInteger");
+	    return new ClassOrInterfaceType(null, UINT);
 	
 	switch (ctx.getText()) {
 	case "address":
@@ -166,17 +195,21 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	case "string":
 	    return new ClassOrInterfaceType(null, "String");
 	default:
-	    return new ClassOrInterfaceType(null, "Uint256BigInteger");
+	    return new ClassOrInterfaceType(null, UINT);
 
 	}
     }
 
     @Override
     public Node visitUserDefinedTypeName(SolidityParser.UserDefinedTypeNameContext ctx) {
+	// A user defined type name is a typename that may contain dots
+
+	// Get all the identifiers making the typename
 	List<String> identifiers= ctx.identifier().stream()
 	    .map(elt -> ((SimpleName) this.visit(elt)).asString())
 	    .collect(Collectors.toList());
 
+	// Return the typename
 	return new ClassOrInterfaceType(null, String.join(".", identifiers));
     }
 
@@ -186,14 +219,17 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     public Node visitFunctionCallExpression(SolidityParser.FunctionCallExpressionContext ctx) {
 	NodeList<Expression> arguments = new NodeList<>();
 
+	// Put all the arguments in the list (if there are some)
 	try {
 	    ctx.functionCallArguments().expressionList().expression().stream()
 		.forEach(elt -> arguments.add((Expression) this.visit(elt)));
 	}
 	catch (Exception e) {}
 
+	// Get the name of the method
 	NameExpr method = (NameExpr) this.visit(ctx.expression());
 
+	// Return the method call
 	return new MethodCallExpr(null, method.getName(), arguments);
     }
     
@@ -248,20 +284,27 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     }
 
     @Override
-    public Node visitDotExpression(SolidityParser.DotExpressionContext ctx) { // TODO: Is this right?
+    public Node visitDotExpression(SolidityParser.DotExpressionContext ctx) {
+	// A dot expression is of the form expr.identifier
+	// In Java, this can be translated as a NameExpr (a name inside an expression)
+	
 	Expression expr = (Expression) this.visit(ctx.expression());
 	SimpleName identifier = (SimpleName) this.visit(ctx.identifier());
-	Name name = new Name(new Name(expr.toString()), identifier.asString());
+	// Name name = new Name(new Name(expr.toString()), identifier.asString());
 
-	return new NameExpr(name.asString());
+	return new NameExpr(expr.toString() + "." + identifier.asString());
     }
 
     @Override
     public Node visitNumberLiteral(SolidityParser.NumberLiteralContext ctx) {
 	// We treat only integers TODO: use NumberUnit and HexNumber (see grammar)
-	ClassOrInterfaceType type = new ClassOrInterfaceType(null, "Uint256BigInteger");
-	NodeList<Expression> integer = new NodeList<>();
-	integer.add(new IntegerLiteralExpr(ctx.DecimalNumber().getText()));
+
+	// The type is Uint256
+	ClassOrInterfaceType type = new ClassOrInterfaceType(null, UINT);
+
+	// Get the Integer
+	NodeList<Expression> integer =
+	    NodeList.nodeList(new IntegerLiteralExpr(ctx.DecimalNumber().getText()));
 
 	return new ObjectCreationExpr(null, type, integer);
     }
@@ -273,7 +316,8 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    return new BooleanLiteralExpr(Boolean.parseBoolean(ctx.BooleanLiteral().getText()));
 	else if (ctx.identifier() != null)
 	    return new NameExpr((SimpleName) this.visit(ctx.identifier()));
-	
+
+	// If it is not a boolean or an identifier, it should be an integer
 	return this.visitChildren(ctx);
     }
 
@@ -321,7 +365,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitFunctionDefinition(SolidityParser.FunctionDefinitionContext ctx) {
-	// Identifier
+	// Get the identifier, if there is none, then it is the fallback function
 	String id;
 	if (ctx.identifier() != null)
 	    id = ((SimpleName) this.visit(ctx.identifier())).asString();
@@ -329,7 +373,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    id = "fallback";
 
 	// Modifiers TODO: implement all modifiers
-	EnumSet modifiers = EnumSet.of(Modifier.PUBLIC); // Default if public
+	EnumSet modifiers = EnumSet.of(Modifier.PUBLIC); // Default is public
 	SolidityParser.ModifierListContext modList = ctx.modifierList();
 
 	if (!modList.PrivateKeyword().isEmpty() || !modList.InternalKeyword().isEmpty())
@@ -399,6 +443,8 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     @Override
     public Node visitReturnStatement(SolidityParser.ReturnStatementContext ctx) {
 	ReturnStmt value;
+
+	// If the return statement returns an expression, go get it
 	if (ctx.expression() != null) {
 	    Expression expr = (Expression) this.visit(ctx.expression());
 	    value = new ReturnStmt(expr);
@@ -411,10 +457,12 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitBlock(SolidityParser.BlockContext ctx) {
-	NodeList<Statement> statements = new NodeList<>();
-	ctx.statement().stream()
-	    .forEach(elt -> statements.add((Statement) this.visit(elt)));
-	
+	NodeList<Statement> statements = NodeList.nodeList(
+							   ctx.statement().stream()
+							   .map(elt -> (Statement) this.visit(elt))
+							   .collect(Collectors.toList())
+							   );
+
 	return new BlockStmt(statements);
     }
 
@@ -448,6 +496,8 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	Expression expr = (Expression) this.visit(ctx.expression());
 	
 	ifStmt = (Statement) this.visit(ctx.statement(0));
+
+	// Get else statement if it exists
 	try {
 	    elseStmt = (Statement) this.visit(ctx.statement(1));
 	}
@@ -476,7 +526,10 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitWhileStatement(SolidityParser.WhileStatementContext ctx) {
-	return new WhileStmt((Expression) this.visit(ctx.expression()), (Statement) this.visit(ctx.statement()));
+	Expression condition = (Expression) this.visit(ctx.expression());
+	Statement statement = (Statement) this.visit(ctx.statement());
+	
+	return new WhileStmt(condition, statement);
     }
 
     @Override
@@ -495,9 +548,10 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     public Node visitVariableDeclaration(SolidityParser.VariableDeclarationContext ctx) {
 	VariableDeclarator var = new VariableDeclarator((Type) this.visit(ctx.typeName()), (SimpleName) this.visit(ctx.identifier()));
 
+	// If the type of var is not a primitive type, one needs to initialize the variable
 	if (!var.getType().isPrimitiveType()) {
 	    ClassOrInterfaceType type = new ClassOrInterfaceType(null, var.getType().toString());
-	    ObjectCreationExpr expr = new ObjectCreationExpr(null, type, new NodeList<Expression>());
+	    ObjectCreationExpr expr = new ObjectCreationExpr(null, type, NodeList.nodeList());
 
 	    var.setInitializer(expr);
 	}
@@ -507,7 +561,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitParameter(SolidityParser.ParameterContext ctx) {
-	// Get the name if there is one
+	// Get the name if there is one (for return parameters, there can be none)
 	SimpleName id = ctx.identifier() != null ? (SimpleName) this.visit(ctx.identifier()) : new SimpleName();
 
 	return new Parameter((Type) this.visit(ctx.typeName()), id);
@@ -520,6 +574,8 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     
 }
 
+// Another visitor that does the same thing as TranslateVisitor but maps
+// some identifiers to other identifers (it allows to rename some variables)
 class TranslateModifierVisitor extends TranslateVisitor {
     private HashMap<String, String> map;
     BlockStmt code;
@@ -534,6 +590,8 @@ class TranslateModifierVisitor extends TranslateVisitor {
 
     @Override
     public Node visitIdentifier(SolidityParser.IdentifierContext ctx) {
+	// Change the identifier if needed
+	
 	if (this.map.containsKey(ctx.getText()))
 	    return new SimpleName(map.get(ctx.getText()));
 	else
@@ -546,7 +604,8 @@ class TranslateModifierVisitor extends TranslateVisitor {
     }
 }
 
-class SolidityModifier { // Class to represent a user defined Solidity modifier.
+// Class to represent a user defined Solidity modifier.
+class SolidityModifier {
     String name;
     ParserRuleContext code;
     ArrayList<String> parameters;
