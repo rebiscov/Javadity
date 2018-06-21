@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.stream.*;
 
 class Helper {
@@ -19,6 +20,8 @@ class Helper {
 
 public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     private static final String UINT = "Uint256BigInteger";
+    private String currentContractName;
+    private HashMap<String, String> typesMap;
     
     private HashMap<String, SolidityModifier> modifiersMap = new HashMap<>();
     
@@ -102,7 +105,16 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitContractDefinition(SolidityParser.ContractDefinitionContext ctx) {
-	List<SolidityParser.ContractPartContext>  contractPartList = ctx.contractPart();
+
+	// Name of the contract
+	String id = ((SimpleName)this.visit(ctx.identifier())).asString();
+	currentContractName = id;
+
+	// Get all the parts of the contract
+	List<SolidityParser.ContractPartContext> contractPartList = ctx.contractPart();
+
+	// Get the mapping of names of contract part to their type
+	typesMap = getTypesMap(contractPartList);
 	
 	// Record all the user defined modifiers
 	contractPartList.stream()
@@ -121,9 +133,6 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 		});
 
 
-	// Name of the contract
-	String id = ((SimpleName)this.visit(ctx.identifier())).asString();
-	
 	// Create a new class representing the contract
 	ClassOrInterfaceDeclaration type = new ClassOrInterfaceDeclaration(EnumSet.of(Modifier.PUBLIC), false, id);
 
@@ -133,7 +142,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	// Add the members
 	contractPartList.stream()
-	    .filter(elt ->  elt.modifierDefinition() == null ) // Do not take the modifiers
+	    .filter(elt -> elt.modifierDefinition() == null ) // Do not take the modifiers
 	    .forEach(elt -> type.addMember((BodyDeclaration) this.visit(elt)));
 
 	return type;
@@ -202,10 +211,10 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitUserDefinedTypeName(SolidityParser.UserDefinedTypeNameContext ctx) {
-	// A user defined type name is a typename that may contain dots
+	// A user defined type name is a typename defined by the user and it may contain dots
 
 	// Get all the identifiers making the typename
-	List<String> identifiers= ctx.identifier().stream()
+	List<String> identifiers = ctx.identifier().stream()
 	    .map(elt -> ((SimpleName) this.visit(elt)).asString())
 	    .collect(Collectors.toList());
 
@@ -381,7 +390,11 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	// User defined modifiers
 	BlockStmt block = (BlockStmt) this.visit(ctx.block());
-	for (SolidityParser.ModifierInvocationContext mod: ctx.modifierList().modifierInvocation()) {
+	
+	List<SolidityParser.ModifierInvocationContext> modifierInvocations = ctx.modifierList().modifierInvocation();
+	Collections.reverse(modifierInvocations);
+	
+	for (SolidityParser.ModifierInvocationContext mod: modifierInvocations) {
 	    String name = mod.identifier().getText();
 	    
 	    List<String> params;
@@ -571,7 +584,26 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     public Node visitIdentifier(SolidityParser.IdentifierContext ctx) {
 	return new SimpleName(ctx.getText());
     }
-    
+
+
+    // Given a list of ContractPart, this function outputs a mapping from names to their types (enum, struct, function or modifier)
+    private HashMap<String, String> getTypesMap(List<SolidityParser.ContractPartContext> contractParts) {
+	HashMap<String, String> typesMap = new HashMap<>();
+	
+	contractParts.stream()
+	    .forEach(elt -> {
+		    if (elt.modifierDefinition() != null)
+			typesMap.put(elt.modifierDefinition().identifier().getText(), "modifier");
+		    else if (elt.functionDefinition() != null && elt.functionDefinition().identifier() != null)
+			typesMap.put(elt.functionDefinition().identifier().getText(), "function");
+		    else if (elt.structDefinition() != null)
+			typesMap.put(elt.structDefinition().getText(), "struct");
+		    else if (elt.enumDefinition() != null)
+			typesMap.put(elt.enumDefinition().getText(), "enum");
+		});
+
+	return typesMap;
+    }
 }
 
 // Another visitor that does the same thing as TranslateVisitor but maps
