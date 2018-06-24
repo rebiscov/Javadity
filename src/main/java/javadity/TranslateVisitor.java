@@ -19,6 +19,8 @@ class Helper {
 }
 
 public class TranslateVisitor extends SolidityBaseVisitor<Node> {
+    private static final String[] imports = {"blockchain.Block", "blockchain.Message", "blockchain.Transaction",
+					     "blockchain.types.Address", "blockchain.types.Uint256", "blockchain.types.Uint256Int"};
     private static final String UINT = "Uint256Int";
     private String currentContractName;
     private HashMap<String, String> typesMap;
@@ -27,6 +29,12 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     
     @Override
     public Node visitSourceUnit(SolidityParser.SourceUnitContext ctx) {
+
+	// Create import declarations
+	NodeList<ImportDeclaration> importDeclarations = new NodeList<>();
+	for (String importDeclaration: imports)
+	    importDeclarations.add(new ImportDeclaration(importDeclaration, false, false));
+
 	
 	// Add all the contracts the list of contracts
 	NodeList contractsList = new NodeList(ctx.contractDefinition().stream() // for all contracts...
@@ -35,7 +43,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 					      );
 
 	// Add all the contracts to the compilation unit
-	CompilationUnit cu = new CompilationUnit(null, new NodeList<ImportDeclaration>(), contractsList, null);
+	CompilationUnit cu = new CompilationUnit(null, importDeclarations, contractsList, null);
 
 	return cu;
     }
