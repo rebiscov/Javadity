@@ -19,7 +19,7 @@ class Helper {
 }
 
 public class TranslateVisitor extends SolidityBaseVisitor<Node> {
-    private static final String UINT = "Uint256BigInteger";
+    private static final String UINT = "Uint256Int";
     private String currentContractName;
     private HashMap<String, String> typesMap;
     
@@ -218,8 +218,15 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    .map(elt -> ((SimpleName) this.visit(elt)).asString())
 	    .collect(Collectors.toList());
 
+	// Get the type
+	String type = String.join(".", identifiers);
+	
+	// Check if it is an enum
+	if (typesMap.containsKey(type) && typesMap.get(type).equals("enum")) 
+	    type = UINT;
+
 	// Return the typename
-	return new ClassOrInterfaceType(null, String.join(".", identifiers));
+	return new ClassOrInterfaceType(null, type);
     }
 
     /* EXPRESSION */
