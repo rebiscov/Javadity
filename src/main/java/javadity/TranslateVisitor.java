@@ -597,9 +597,9 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 		    else if (elt.functionDefinition() != null && elt.functionDefinition().identifier() != null)
 			typesMap.put(elt.functionDefinition().identifier().getText(), "function");
 		    else if (elt.structDefinition() != null)
-			typesMap.put(elt.structDefinition().getText(), "struct");
+			typesMap.put(elt.structDefinition().identifier().getText(), "struct");
 		    else if (elt.enumDefinition() != null)
-			typesMap.put(elt.enumDefinition().getText(), "enum");
+			typesMap.put(elt.enumDefinition().identifier().getText(), "enum");
 		});
 
 	return typesMap;
