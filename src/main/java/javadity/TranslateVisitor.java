@@ -16,12 +16,61 @@ import java.util.Collections;
 import java.util.stream.*;
 
 class Helper {
+    public static final String UINT = "Uint256Int";
+
+    public static ClassOrInterfaceType getUintType() {
+	return new ClassOrInterfaceType(null, UINT);
+    }
+
+    public static ClassOrInterfaceType getAddressType() {
+	return new ClassOrInterfaceType(null, "Address");
+    }
+
+    public static ClassOrInterfaceType getMessageType() {
+	return new ClassOrInterfaceType(null, "Message");
+    }
+
+    public static ClassOrInterfaceType getTransactionType() {
+	return new ClassOrInterfaceType(null, "Transaction");
+    }
+
+    public static ClassOrInterfaceType getBlockType() {
+	return new ClassOrInterfaceType(null, "Block");
+    }    
+
+    public static MethodDeclaration getRequire() {
+	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
+	NodeList<Parameter> parameters = NodeList.nodeList(new Parameter(PrimitiveType.booleanType(), "b"));
+	
+	MethodDeclaration require = new MethodDeclaration(modifiers, "require", new VoidType(), parameters);
+
+	return require;
+    }
+
+    public static NodeList<FieldDeclaration> getMagicVariables() {
+	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
+	NodeList<FieldDeclaration> variables = new NodeList<>();
+
+	// now
+	variables.add(new FieldDeclaration(modifiers, getUintType(), "now"));
+
+	// msg
+	variables.add(new FieldDeclaration(modifiers, getMessageType(), "msg"));
+
+	// block
+	variables.add(new FieldDeclaration(modifiers, getBlockType(), "block"));
+
+	// tx
+	variables.add(new FieldDeclaration(modifiers, getTransactionType(), "tx"));
+
+	return variables;
+    }
 }
 
 public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     private static final String[] imports = {"blockchain.Block", "blockchain.Message", "blockchain.Transaction",
 					     "blockchain.types.Address", "blockchain.types.Uint256", "blockchain.types.Uint256Int"};
-    private static final String UINT = "Uint256Int";
+    private static final String UINT = Helper.UINT;
     private String currentContractName;
     private HashMap<String, String> typesMap;
     
@@ -149,6 +198,11 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    .forEach(elt -> type.addExtendedType(elt.userDefinedTypeName().getText()));
 
 	// Add the members
+	type.addMember(Helper.getRequire());
+
+	Helper.getMagicVariables().stream()
+	    .forEach(elt -> type.addMember(elt));
+	
 	contractPartList.stream()
 	    .filter(elt -> elt.modifierDefinition() == null ) // Do not take the modifiers
 	    .forEach(elt -> type.addMember((BodyDeclaration) this.visit(elt)));
@@ -230,7 +284,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	String type = String.join(".", identifiers);
 	
 	// Check if it is an enum
-	if (typesMap.containsKey(type) && typesMap.get(type).equals("enum")) 
+	if (typesMap.containsKey(type) && typesMap.get(type).equals("enum"))
 	    type = UINT;
 
 	// Return the typename
@@ -373,15 +427,14 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	Expression expr2 = (Expression) this.visit(ctx.expression(1));
 
 	NodeList<Expression> parameters = new NodeList<>(expr2);
-	SimpleName op;
-	
-	if (ctx.binop.getText().equals("=="))
-	    op = new SimpleName("equals");
-	else 
-	    op = new SimpleName("notEquals");
+	SimpleName op = new SimpleName("eq");
 
+	MethodCallExpr eq = new MethodCallExpr(expr1, op, parameters);
 	
-	return new MethodCallExpr(expr1, op, parameters);
+	if (ctx.binop.getText().equals("!="))
+	    return new UnaryExpr(eq, UnaryExpr.Operator.LOGICAL_COMPLEMENT);
+	
+	return eq;
     }
 
 
@@ -458,8 +511,10 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	// MethodDeclaration
 	MethodDeclaration method = new MethodDeclaration(modifiers, id, returnedType, javaParameterList);
+	NodeList<ReferenceType> exceptions = NodeList.nodeList(new ClassOrInterfaceType(null, "Exception"));
+	method.setThrownExceptions(exceptions);
 
-	// Get block
+	// Set block
 	method.setBody(block);
 	
 	
