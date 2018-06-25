@@ -47,6 +47,20 @@ class Helper {
 	return require;
     }
 
+    public static MethodDeclaration getKeccak() {
+	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
+	NameExpr x = new NameExpr("x");
+	NodeList<Parameter> parameters = NodeList.nodeList(new Parameter(getUintType(), x.toString()));
+
+	MethodCallExpr keccak = new MethodCallExpr(x, "keccak256");
+	ReturnStmt ret = new ReturnStmt("x"); // TODO: finish implementation of keccak
+
+	MethodDeclaration method = new MethodDeclaration(modifiers, "keccak256", getUintType(), parameters);
+	method.setBody(new BlockStmt(NodeList.nodeList(ret)));
+
+	return method;
+    }
+
     public static NodeList<FieldDeclaration> getMagicVariables() {
 	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
 	NodeList<FieldDeclaration> variables = new NodeList<>();
@@ -199,6 +213,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	// Add the members
 	type.addMember(Helper.getRequire());
+	type.addMember(Helper.getKeccak());
 
 	Helper.getMagicVariables().stream()
 	    .forEach(elt -> type.addMember(elt));
