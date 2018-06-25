@@ -55,10 +55,19 @@ class Helper {
 
     public static MethodDeclaration getRequire() {
 	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
-	NodeList<Parameter> parameters = NodeList.nodeList(new Parameter(PrimitiveType.booleanType(), "b"));
+	NameExpr b = new NameExpr("b");
+	NodeList<Parameter> parameters = NodeList.nodeList(new Parameter(PrimitiveType.booleanType(), b.toString()));
 	
 	MethodDeclaration require = new MethodDeclaration(modifiers, "require", new VoidType(), parameters);
 
+	NodeList<ReferenceType> exceptions = NodeList.nodeList(new ClassOrInterfaceType(null, "Exception"));
+	require.setThrownExceptions(exceptions);
+
+	ThrowStmt throwException = new ThrowStmt(new ObjectCreationExpr(null, (ClassOrInterfaceType) exceptions.get(0), new NodeList<Expression>()));
+	IfStmt ifStatement = new IfStmt(b, throwException, null);
+
+	require.setBody(new BlockStmt(NodeList.nodeList(ifStatement)));
+	
 	return require;
     }
 
