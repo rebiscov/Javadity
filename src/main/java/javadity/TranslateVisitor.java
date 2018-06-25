@@ -36,7 +36,21 @@ class Helper {
 
     public static ClassOrInterfaceType getBlockType() {
 	return new ClassOrInterfaceType(null, "Block");
-    }    
+    }
+
+    public static MethodDeclaration getSelfdestruct() {
+	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PRIVATE);
+	NodeList<Parameter> parameters = NodeList.nodeList(new Parameter(getAddressType(), "rcv"));
+
+	MethodDeclaration selfdestruct = new MethodDeclaration(modifiers, "selfdestruct", new VoidType(), parameters);
+
+	AssignExpr assign = new AssignExpr(new NameExpr("destroyed"), new BooleanLiteralExpr(true), AssignExpr.Operator.ASSIGN);
+	ExpressionStmt assignStmt = new ExpressionStmt(assign);
+
+	selfdestruct.setBody(new BlockStmt(NodeList.nodeList(assignStmt)));
+
+	return selfdestruct;
+    }
 
     public static MethodDeclaration getRequire() {
 	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
@@ -76,6 +90,9 @@ class Helper {
 
 	// tx
 	variables.add(new FieldDeclaration(modifiers, getTransactionType(), "tx"));
+
+	// destroyed
+	variables.add(new FieldDeclaration(modifiers, PrimitiveType.booleanType(), "destroyed"));
 
 	return variables;
     }
@@ -210,10 +227,12 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	// Deal with inheritance
 	ctx.inheritanceSpecifier().stream()
 	    .forEach(elt -> type.addExtendedType(elt.userDefinedTypeName().getText()));
+	type.addExtendedType(Helper.getAddressType());
 
 	// Add the members
 	type.addMember(Helper.getRequire());
 	type.addMember(Helper.getKeccak());
+	type.addMember(Helper.getSelfdestruct());	
 
 	Helper.getMagicVariables().stream()
 	    .forEach(elt -> type.addMember(elt));
