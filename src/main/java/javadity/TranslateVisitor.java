@@ -99,12 +99,17 @@ class Helper {
     }
 }
 
+/*********************/
+/* TRANSLATE VISITOR */
+/*********************/
+
 public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     private static final String[] imports = {"blockchain.Block", "blockchain.Message", "blockchain.Transaction",
 					     "blockchain.types.Address", "blockchain.types.Uint256", "blockchain.types.Uint256Int"};
     private static final String UINT = Helper.UINT;
     private String currentContractName;
     private HashMap<String, String> typesMap;
+    private ArrayList<MethodDeclaration> structConstructors = new ArrayList<>();
     
     private HashMap<String, SolidityModifier> modifiersMap = new HashMap<>();
     
@@ -142,12 +147,56 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	// Get all the fields to put in the structure
 	List<SolidityParser.VariableDeclarationContext> fieldList = ctx.variableDeclaration();
+
+	// Method declaration for the constructor of the struct
+	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PRIVATE);
+	ClassOrInterfaceType t = new ClassOrInterfaceType(null, structName);
+	MethodDeclaration constructor = new MethodDeclaration(modifiers, t, structName);
+	NodeList<Parameter> parameters = new NodeList<>();
 	
 	// Add the fields to the class 
 	fieldList.stream()
-	    .forEach(elt -> type.addMember(new FieldDeclaration(EnumSet.of(Modifier.PUBLIC),
-								(VariableDeclarator) this.visit(elt)
-								)));
+	    .forEach(elt -> {
+		    VariableDeclarator var = (VariableDeclarator) this.visit(elt); // Record the parameters type for the constructor
+		    parameters.add(new Parameter(var.getType(), var.getName().asString()));
+		    type.addMember(new FieldDeclaration(EnumSet.of(Modifier.PUBLIC),
+							       var));
+		});
+
+	// Add the parameters for the constructor
+	constructor.setParameters(parameters);
+
+	// Create the body of the constructor
+	NodeList<Statement> body = new NodeList<>();
+	NameExpr ret = new NameExpr("ret");
+
+	ObjectCreationExpr initializer = new ObjectCreationExpr(null,
+								t,
+								new NodeList<Expression>());
+	VariableDeclarator structCreation = new VariableDeclarator(t,
+								   ret.toString(),
+								   initializer);
+	
+	ReturnStmt returnStmt = new ReturnStmt(ret);
+	
+	body.add(new ExpressionStmt(new VariableDeclarationExpr(structCreation)));
+
+	parameters.stream()
+	    .forEach(elt -> {
+		    FieldAccessExpr field = new FieldAccessExpr(ret, elt.getName().asString());
+		    NameExpr expr = new NameExpr(elt.getName());
+		    AssignExpr assign = new AssignExpr(field, expr, AssignExpr.Operator.ASSIGN);
+		    
+		    body.add(new ExpressionStmt(assign));
+		});
+	
+	body.add(returnStmt);
+
+	constructor.setBody(new BlockStmt(body));
+
+	// Add the constructor to the list of constructor
+	structConstructors.add(constructor);
+
 
 	return type;
     }
@@ -241,6 +290,10 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	contractPartList.stream()
 	    .filter(elt -> elt.modifierDefinition() == null ) // Do not take the modifiers
 	    .forEach(elt -> type.addMember((BodyDeclaration) this.visit(elt)));
+
+	// Add the struct constructor
+	structConstructors.stream()
+	    .forEach(elt -> type.addMember(elt));
 
 	return type;
     }
@@ -348,7 +401,14 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    ctx.functionCallArguments().expressionList().expression().stream()
 		.forEach(elt -> arguments.add((Expression) this.visit(elt)));
 	}
-	catch (Exception e) {}
+	catch (Exception e) { // If it is not an expression list, it my be a nameValue list
+	    try {
+		ctx.functionCallArguments().nameValueList().nameValue().stream()
+		    .forEach(elt -> arguments.add((Expression) this.visit(elt.expression())));
+	    }
+	    catch (Exception f) {}
+	}
+
 
 	
 	// Return the method call
