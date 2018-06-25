@@ -539,7 +539,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	Expression expr1 = (Expression) this.visit(ctx.expression(0));
 	Expression expr2 = (Expression) this.visit(ctx.expression(1));
 
-	NodeList<Expression> parameters = new NodeList<>(expr2);
+	NodeList<Expression> parameters = NodeList.nodeList(expr2);
 	SimpleName op = new SimpleName("eq");
 
 	MethodCallExpr eq = new MethodCallExpr(expr1, op, parameters);
@@ -548,6 +548,22 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    return new UnaryExpr(eq, UnaryExpr.Operator.LOGICAL_COMPLEMENT);
 	
 	return eq;
+    }
+
+    @Override
+    public Node visitParenExpression(SolidityParser.ParenExpressionContext ctx) {
+	Expression expr = (Expression) this.visit(ctx.expression());
+
+	return expr;
+    }
+
+    @Override
+    public Node visitTernaryExpression(SolidityParser.TernaryExpressionContext ctx) {
+	Expression condition = (Expression) this.visit(ctx.expression(0));
+	Expression expr1 = (Expression) this.visit(ctx.expression(1));
+	Expression expr2 = (Expression) this.visit(ctx.expression(2));
+
+	return new ConditionalExpr(condition, expr1, expr2);
     }
 
 
