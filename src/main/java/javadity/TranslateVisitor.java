@@ -64,7 +64,7 @@ class Helper {
 	require.setThrownExceptions(exceptions);
 
 	ThrowStmt throwException = new ThrowStmt(new ObjectCreationExpr(null, (ClassOrInterfaceType) exceptions.get(0), new NodeList<Expression>()));
-	IfStmt ifStatement = new IfStmt(b, throwException, null);
+	IfStmt ifStatement = new IfStmt(new UnaryExpr(b, UnaryExpr.Operator.LOGICAL_COMPLEMENT), throwException, null);
 
 	require.setBody(new BlockStmt(NodeList.nodeList(ifStatement)));
 	
