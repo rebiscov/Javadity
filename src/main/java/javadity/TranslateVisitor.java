@@ -77,9 +77,9 @@ class Helper {
 	NodeList<Parameter> parameters = NodeList.nodeList(new Parameter(getUintType(), x.toString()));
 
 	MethodCallExpr keccak = new MethodCallExpr(x, "keccak256");
-	ReturnStmt ret = new ReturnStmt("x"); // TODO: finish implementation of keccak
+	ReturnStmt ret = new ReturnStmt(keccak); // TODO: finish implementation of keccak
 
-	MethodDeclaration method = new MethodDeclaration(modifiers, "keccak256", getUintType(), parameters);
+	MethodDeclaration method = new MethodDeclaration(modifiers, "keccak256", new ClassOrInterfaceType(null, "Uint256"), parameters); // Need to come up with a proper fix
 	method.setBody(new BlockStmt(NodeList.nodeList(ret)));
 
 	return method;
