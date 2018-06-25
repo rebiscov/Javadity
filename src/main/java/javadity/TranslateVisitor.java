@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Collections;
+import java.util.regex.Pattern;
 import java.util.stream.*;
 
 class Helper {
@@ -329,18 +330,27 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitFunctionCallExpression(SolidityParser.FunctionCallExpressionContext ctx) {
-	NodeList<Expression> arguments = new NodeList<>();
+	NodeList<Expression> arguments = new NodeList<>(); // List to store the arguments
+	
+	// Get the name of the method
+	NameExpr method = (NameExpr) this.visit(ctx.expression());
+
+	String[] methodNameParts = method.toString().split(Pattern.quote("."));
+	int length = methodNameParts.length - 1;
+
+	// If it is a transfer, add the argument 'this' which is implicit in Solidity
+	if (length > 0 && methodNameParts[length].equals("transfer"))
+	    arguments.add(new ThisExpr());
 
 	// Put all the arguments in the list (if there are some)
+
 	try {
 	    ctx.functionCallArguments().expressionList().expression().stream()
 		.forEach(elt -> arguments.add((Expression) this.visit(elt)));
 	}
 	catch (Exception e) {}
 
-	// Get the name of the method
-	NameExpr method = (NameExpr) this.visit(ctx.expression());
-
+	
 	// Return the method call
 	return new MethodCallExpr(null, method.getName(), arguments);
     }
