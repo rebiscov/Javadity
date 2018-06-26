@@ -86,7 +86,7 @@ class Helper {
 
 	// updateBlockchainVariables
 	NodeList<Statement> statements = new NodeList<>();
-	statements.add(new ExpressionStmt(new MethodCallExpr(null, "updateBlockchainVariables", arguments)));
+	statements.add(new ExpressionStmt(new MethodCallExpr(null, "updateBlockchainVariables", new NodeList<Expression>(arguments))));
 
 	// method call
 	arguments.clear();
@@ -105,8 +105,10 @@ class Helper {
 	CatchClause catchClause = new CatchClause(new Parameter(new ClassOrInterfaceType(null, "Exception"), "e"), catchBlock);
 
 	TryStmt tryStmt = new TryStmt(tryBlock, NodeList.nodeList(catchClause), null);
+
+	statements.add(tryStmt);
 	
-	callable.setBody(new BlockStmt(NodeList.nodeList(tryStmt)));
+	callable.setBody(new BlockStmt(statements));
 
 	return callable;
     }
