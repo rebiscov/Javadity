@@ -39,6 +39,78 @@ class Helper {
 	return new ClassOrInterfaceType(null, "Block");
     }
 
+    public static MethodDeclaration getUpdateBlockchainVariables() {
+	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
+	NodeList<Parameter> parameters = new NodeList<>();
+
+	parameters.add(new Parameter(getMessageType(), "_msg"));
+	parameters.add(new Parameter(getBlockType(), "_block"));
+	parameters.add(new Parameter(getTransactionType(), "_tx"));
+
+	MethodDeclaration updateBlockchainVars = new MethodDeclaration(modifiers, "updateBlockchainVariables", new VoidType(), parameters);
+
+	NodeList<Statement> statements = new NodeList<>();
+
+	AssignExpr assign1 = new AssignExpr(new NameExpr("msg"), new NameExpr("_msg"), AssignExpr.Operator.ASSIGN);
+	AssignExpr assign2 = new AssignExpr(new NameExpr("block"), new NameExpr("_block"), AssignExpr.Operator.ASSIGN);
+	AssignExpr assign3 = new AssignExpr(new NameExpr("tx"), new NameExpr("_tx"), AssignExpr.Operator.ASSIGN);
+	
+	statements.add(new ExpressionStmt(assign1));
+	statements.add(new ExpressionStmt(assign2));
+	statements.add(new ExpressionStmt(assign3));
+
+	updateBlockchainVars.setBody(new BlockStmt(statements));
+
+	return updateBlockchainVars;
+    }
+
+    public static MethodDeclaration getFunctionCallable(MethodDeclaration method) {
+	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
+	NodeList<Parameter> parameters = new NodeList<>(method.getParameters());
+
+	Parameter msg = new Parameter(getMessageType(), "_msg");
+	Parameter block = new Parameter(getBlockType(), "_block");
+	Parameter tx = new Parameter(getTransactionType(), "_tx");
+	
+	parameters.add(msg);
+	parameters.add(block);
+	parameters.add(tx);	
+
+
+	MethodDeclaration callable = new MethodDeclaration(modifiers, "call_" + method.getName().asString(), method.getType(), parameters);
+
+	NodeList<Expression> arguments = new NodeList<>();
+	arguments.add(new NameExpr(msg.getName()));
+	arguments.add(new NameExpr(block.getName()));
+	arguments.add(new NameExpr(tx.getName()));	
+
+	// updateBlockchainVariables
+	NodeList<Statement> statements = new NodeList<>();
+	statements.add(new ExpressionStmt(new MethodCallExpr(null, "updateBlockchainVariables", arguments)));
+
+	// method call
+	arguments.clear();
+
+	method.getParameters()
+	    .forEach(elt ->
+		     arguments.add(new NameExpr(elt.getName())));
+
+	ExpressionStmt call = new ExpressionStmt(new MethodCallExpr(null, method.getName().asString(), arguments));
+
+	// TryCatch
+	BlockStmt tryBlock = new BlockStmt(NodeList.nodeList(call));
+
+	ExpressionStmt printExc = new ExpressionStmt(new MethodCallExpr(new NameExpr("System.out"), "println", NodeList.nodeList(new NameExpr("e"))));
+	BlockStmt catchBlock = new BlockStmt(NodeList.nodeList(printExc));
+	CatchClause catchClause = new CatchClause(new Parameter(new ClassOrInterfaceType(null, "Exception"), "e"), catchBlock);
+
+	TryStmt tryStmt = new TryStmt(tryBlock, NodeList.nodeList(catchClause), null);
+	
+	callable.setBody(new BlockStmt(NodeList.nodeList(tryStmt)));
+
+	return callable;
+    }
+
     public static MethodDeclaration getSelfdestruct() {
 	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PRIVATE);
 	NodeList<Parameter> parameters = NodeList.nodeList(new Parameter(getAddressType(), "rcv"));
@@ -291,14 +363,34 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	// Add the members
 	type.addMember(Helper.getRequire());
 	type.addMember(Helper.getKeccak());
-	type.addMember(Helper.getSelfdestruct());	
+	type.addMember(Helper.getSelfdestruct());
+	type.addMember(Helper.getUpdateBlockchainVariables());
 
 	Helper.getMagicVariables().stream()
 	    .forEach(elt -> type.addMember(elt));
 	
 	contractPartList.stream()
 	    .filter(elt -> elt.modifierDefinition() == null ) // Do not take the modifiers
-	    .forEach(elt -> type.addMember((BodyDeclaration) this.visit(elt)));
+	    .forEach(elt -> {
+		    BodyDeclaration decl = ((BodyDeclaration) this.visit(elt));
+		    
+		    // If it is a public function, make it callable
+		    if (decl.isMethodDeclaration() && decl.asMethodDeclaration().getModifiers().contains(Modifier.PUBLIC)) {
+			MethodDeclaration method = decl.asMethodDeclaration();
+			MethodDeclaration callable = Helper.getFunctionCallable(method);
+
+			EnumSet<Modifier> modifiers = method.getModifiers();
+			modifiers.remove(Modifier.PUBLIC);
+			modifiers.add(Modifier.PRIVATE);
+			
+			method.setModifiers(modifiers);
+
+			type.addMember(callable);
+			type.addMember(method);
+		    }
+		    else
+			type.addMember(decl);
+		});
 
 	// Add the struct constructor
 	structConstructors.stream()
