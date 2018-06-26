@@ -664,6 +664,70 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     /* CONTRACT PARTS */
 
     @Override
+    public Node visitConstructorDefinition (SolidityParser.ConstructorDefinitionContext ctx) {
+	String id = currentContractName;
+
+	// Modifiers TODO: implement all modifiers
+	EnumSet modifiers = EnumSet.of(Modifier.PUBLIC); // Default is public
+	SolidityParser.ModifierListContext modList = ctx.modifierList();
+
+	if (!modList.PrivateKeyword().isEmpty() || !modList.InternalKeyword().isEmpty())
+	    modifiers = EnumSet.of(Modifier.PRIVATE);
+	
+	// Parameters list
+	List<SolidityParser.ParameterContext> solParameterList = ctx.parameterList().parameter();
+	NodeList<Parameter> javaParameterList = new NodeList<>();
+	solParameterList.stream()
+	    .forEach(elt -> javaParameterList.add((Parameter) this.visit(elt)));
+
+	// MethodDeclaration
+	ConstructorDeclaration method = new ConstructorDeclaration(modifiers, id);
+	method.setParameters(javaParameterList);
+	NodeList<ReferenceType> exceptions = NodeList.nodeList(new ClassOrInterfaceType(null, "Exception"));
+	method.setThrownExceptions(exceptions);
+
+	// User defined modifiers
+	BlockStmt block = (BlockStmt) this.visit(ctx.block());
+	
+	List<SolidityParser.ModifierInvocationContext> modifierInvocations = ctx.modifierList().modifierInvocation();
+	Collections.reverse(modifierInvocations);
+	
+	for (SolidityParser.ModifierInvocationContext mod: modifierInvocations) {
+	    String name = mod.identifier().getText();
+	    
+	    List<String> params;
+	    try {
+		params = new ArrayList(mod.expressionList().expression().stream()
+				       .map(elt -> elt.getText())
+				       .collect(Collectors.toList()));
+
+	    }
+	    catch (NullPointerException e) {
+		params = new ArrayList<String>();
+	    }
+
+
+	    SolidityModifier solMod = modifiersMap.get(name);
+
+	    HashMap<String, String> map = new HashMap<>();
+
+	    for (int i = 0; i < params.size(); i++)
+		map.put(solMod.parameters.get(i), params.get(i));
+
+	    TranslateModifierVisitor modVisitor = new TranslateModifierVisitor(map, block);
+
+	    block = (BlockStmt) modVisitor.visit(solMod.code);
+	}
+
+	
+	// Set block
+	method.setBody(block);
+	
+	
+	return method;
+    }
+    
+    @Override
     public Node visitFunctionDefinition(SolidityParser.FunctionDefinitionContext ctx) {
 	// Get the identifier, if there is none, then it is the fallback function
 	String id;
