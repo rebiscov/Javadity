@@ -5,3 +5,5 @@ target
 *.sol
 src/main/java/javadity/Solidity*
 *.xml
+*.class
+src/main/java/javadity/Test*
