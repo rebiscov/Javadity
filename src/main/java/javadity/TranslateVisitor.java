@@ -39,6 +39,14 @@ class Helper {
 	return new ClassOrInterfaceType(null, "Block");
     }
 
+    public static ExpressionStmt getCallToPayableModifier() {
+	NameExpr msg = new NameExpr("msg");
+
+	MethodCallExpr payable = new MethodCallExpr(null, "payable", NodeList.nodeList(msg));
+
+	return new ExpressionStmt(payable);
+    }
+
     public static MethodDeclaration getUpdateBlockchainVariables() {
 	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
 	NodeList<Parameter> parameters = new NodeList<>();
@@ -743,8 +751,10 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	if (!modList.PrivateKeyword().isEmpty() || !modList.InternalKeyword().isEmpty())
 	    modifiers = EnumSet.of(Modifier.PRIVATE);
 
-	// User defined modifiers
+
 	BlockStmt block = (BlockStmt) this.visit(ctx.block());
+
+	// User defined modifiers
 	
 	List<SolidityParser.ModifierInvocationContext> modifierInvocations = ctx.modifierList().modifierInvocation();
 	Collections.reverse(modifierInvocations);
@@ -775,7 +785,9 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	    block = (BlockStmt) modVisitor.visit(solMod.code);
 	}
-	    
+
+	// Payable modifier
+	block.getStatements().addFirst(Helper.getCallToPayableModifier());
 
 	// Parameters list
 	List<SolidityParser.ParameterContext> solParameterList = ctx.parameterList().parameter();
