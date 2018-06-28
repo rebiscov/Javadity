@@ -502,10 +502,6 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	String[] methodNameParts = method.toString().split(Pattern.quote("."));
 	int length = methodNameParts.length - 1;
 
-	// If it is a transfer, add the argument 'this' which is implicit in Solidity
-	if (length > 0 && methodNameParts[length].equals("transfer"))
-	    arguments.add(new ThisExpr());
-
 	// Put all the arguments in the list (if there are some)
 
 	try {
