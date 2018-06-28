@@ -1,6 +1,8 @@
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.*;
 
+import java.nio.file.*;
+
 import blockchain.types.Uint256;
 import blockchain.types.Uint256Int;
 import blockchain.types.Address;
@@ -38,6 +40,13 @@ public class App {
 
 	 cu = SymbolSolver.refineTranslation(cu);
 
-	 System.out.println(cu.toString());
+	 
+	 Path file;
+	 if (args.length > 1)
+	     file = Paths.get(args[0]);
+	 else
+	     file = Paths.get("NoName.java");
+	 
+	 Files.write(file, cu.toString().getBytes());
     }
 }

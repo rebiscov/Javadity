@@ -29,10 +29,12 @@ public class SymbolSolver {
 		    Expression scope = mce.getScope().get();
 		    ResolvedType resolvedTypeScope = scope.calculateResolvedType();
 
+		    // If this scope is an Address and it is a call the method transfer
 		    if (resolvedTypeScope.describe().equals(ADDRESS_TYPE) && mce.getNameAsString().equals("transfer")) {
-			NodeList<Expression> arguments = mce.getArguments();
-
-			arguments.addFirst(new ThisExpr());
+			NodeList<Expression> transferArgs = mce.getArguments();
+			transferArgs.add(new ThisExpr());
+			transferArgs.add(new NameExpr("block"));
+			transferArgs.add(new NameExpr("tx"));
 		    }
 		}
 	    });
