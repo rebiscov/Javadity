@@ -317,6 +317,20 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	return new ClassOrInterfaceType(null, type);
     }
 
+    @Override
+    public Node visitTypeName(SolidityParser.TypeNameContext ctx) {
+	// If it is the type of an array
+	if (ctx.typeName() != null) {
+	    Type type = (Type) this.visit(ctx.typeName());
+
+	    return new ArrayType(type, ArrayType.Origin.TYPE, new NodeList<AnnotationExpr>());
+	}
+	// If it is not an array...
+	else {
+	    return visitChildren(ctx);
+	}
+    }
+
     /* EXPRESSION */
 
     @Override
