@@ -624,7 +624,13 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	}
 
 	// Payable modifier
-	block.getStatements().addFirst(Helper.getCallToPayableModifier());
+	try {
+	    NodeList<Statement> statements = block.getStatements();
+	    ctx.modifierList().stateMutability().stream()
+		.filter(elt -> elt.PayableKeyword() != null)
+		.forEach(elt -> statements.addFirst(Helper.getCallToPayableModifier()));
+	}
+	catch (Exception e) {}
 
 	// Parameters list
 	List<SolidityParser.ParameterContext> solParameterList = ctx.parameterList().parameter();
