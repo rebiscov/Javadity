@@ -91,6 +91,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	ObjectCreationExpr initializer = new ObjectCreationExpr(null,
 								t,
 								new NodeList<Expression>());
+
 	VariableDeclarator structCreation = new VariableDeclarator(t,
 								   ret.toString(),
 								   initializer);
@@ -255,21 +256,9 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	
 
 	// If it exists, get the expression that initialize the state variable
-	Expression expr;
-	try {
+	Expression expr = null;
+	if (ctx.expression() != null)
 	    expr = (Expression) this.visit(ctx.expression());
-	}
-	catch (java.lang.NullPointerException e){
-	    expr = null;
-
-	    // If there is not initialization and it is not a primitive type then
-	    // put a default initialization
-	    if (!type.isPrimitiveType()) { 
-		ClassOrInterfaceType clazz =
-		    new ClassOrInterfaceType(null, type.toString());
-		expr = new ObjectCreationExpr(null, clazz, new NodeList<Expression>());
-	    }
-	}
 	
 	
 	return new FieldDeclaration(modifiers, new VariableDeclarator(type, id, expr));
@@ -772,14 +761,6 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     @Override
     public Node visitVariableDeclaration(SolidityParser.VariableDeclarationContext ctx) {
 	VariableDeclarator var = new VariableDeclarator((Type) this.visit(ctx.typeName()), (SimpleName) this.visit(ctx.identifier()));
-
-	// If the type of var is not a primitive type, one needs to initialize the variable
-	if (!var.getType().isPrimitiveType()) {
-	    ClassOrInterfaceType type = new ClassOrInterfaceType(null, var.getType().toString());
-	    ObjectCreationExpr expr = new ObjectCreationExpr(null, type, NodeList.nodeList());
-
-	    var.setInitializer(expr);
-	}
 
 	return var;
     }

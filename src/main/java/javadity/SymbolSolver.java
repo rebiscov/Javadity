@@ -10,7 +10,10 @@ import java.io.File;
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.NodeList;
+import com.github.javaparser.ast.*;
+import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.type.*;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.model.resolution.TypeSolver;
@@ -22,6 +25,20 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeS
 public class SymbolSolver {
     public static final String PATH_TO_TYPES = "/home/vincent/Documents/M1/Internship/translator/javadity/src/main/java/javadity/";
     public static final String ADDRESS_TYPE = "blockchain.types.Address";
+
+    private static void setDefaultValue(CompilationUnit cu) {
+	cu.findAll(VariableDeclarator.class).forEach(vd -> {
+		Type type = vd.getType();
+
+
+		// If there is no initialization for a non-primitive type, add a default one
+		if (!vd.getInitializer().isPresent() && !type.isPrimitiveType()) {
+		    ClassOrInterfaceType clazz = new ClassOrInterfaceType(null, type.toString());
+
+		    vd.setInitializer(new ObjectCreationExpr(null, clazz, new NodeList<Expression>()));
+		}
+	    });
+    }
 
     private static void correctAddressTransferMethod(CompilationUnit cu) {
 	cu.findAll(MethodCallExpr.class).forEach(mce -> {
@@ -53,6 +70,7 @@ public class SymbolSolver {
 
 	cu = JavaParser.parse(cu.toString());
 	correctAddressTransferMethod(cu);
+	setDefaultValue(cu);
 
 	return cu;
     }
