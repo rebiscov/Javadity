@@ -308,16 +308,17 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitTypeName(SolidityParser.TypeNameContext ctx) {
+
 	// If it is the type of an array
 	if (ctx.typeName() != null) {
 	    Type type = (Type) this.visit(ctx.typeName());
 
 	    return new ArrayType(type, ArrayType.Origin.TYPE, new NodeList<AnnotationExpr>());
 	}
+
 	// If it is not an array...
-	else {
+	else
 	    return visitChildren(ctx);
-	}
     }
 
     /* EXPRESSION */
@@ -384,6 +385,14 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    op = new SimpleName("mod");
 
 	return new MethodCallExpr(expr1, op, parameters);
+    }
+
+    @Override
+    public Node visitArrayAccessExpression(SolidityParser.ArrayAccessExpression ctx) {
+	Expression array = (Expression) this.visit(ctx.expression(0));
+	Expression index = (Expression) this.visit(ctx.expression(1));
+
+	return new ArrayAccess(array, index);
     }
 
     @Override
