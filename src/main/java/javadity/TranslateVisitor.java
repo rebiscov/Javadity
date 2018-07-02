@@ -255,12 +255,30 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	String id = ((SimpleName) this.visit(ctx.identifier())).asString();
 	
 
-	// If it exists, get the expression that initialize the state variable
+	// If it exists, get the expression that initializes the state variable
 	Expression expr = null;
 	if (ctx.expression() != null)
 	    expr = (Expression) this.visit(ctx.expression());
-	
-	
+
+	// If is is an array, initializes it
+	else if (type.isArrayType()) {
+	    Type t = type.clone();
+	    NodeList<ArrayCreationLevel> dimensions = new NodeList<>();
+
+	    SolidityParser.TypeNameContext typeContext = ctx.typeName();
+
+	    // Get the dimensions
+	    while (t.isArrayType()) {
+		Expression dimension = (Expression) this.visit(typeContext.expression());
+
+		dimensions.add(new ArrayCreationLevel(dimension));
+		t =  t.asArrayType().getComponentType();
+		typeContext = typeContext.typeName();
+	    }
+	    expr = new ArrayCreationExpr(t, dimensions, null);
+	}
+
+
 	return new FieldDeclaration(modifiers, new VariableDeclarator(type, id, expr));
     }
 
@@ -388,11 +406,11 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     }
 
     @Override
-    public Node visitArrayAccessExpression(SolidityParser.ArrayAccessExpression ctx) {
+    public Node visitArrayAccessExpression(SolidityParser.ArrayAccessExpressionContext ctx) {
 	Expression array = (Expression) this.visit(ctx.expression(0));
 	Expression index = (Expression) this.visit(ctx.expression(1));
 
-	return new ArrayAccess(array, index);
+	return new ArrayAccessExpr(array, index);
     }
 
     @Override

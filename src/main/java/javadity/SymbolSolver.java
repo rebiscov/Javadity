@@ -25,6 +25,7 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeS
 public class SymbolSolver {
     public static final String PATH_TO_TYPES = "/home/vincent/Documents/M1/Internship/translator/javadity/src/main/java/javadity/";
     public static final String ADDRESS_TYPE = "blockchain.types.Address";
+    public static final String UINT_TYPE = "blockchain.types.Uint256Int";
 
     private static void setDefaultValue(CompilationUnit cu) {
 	cu.findAll(VariableDeclarator.class).forEach(vd -> {
@@ -57,6 +58,28 @@ public class SymbolSolver {
 	    });
     }
 
+    private static void correctArrayAccess(CompilationUnit cu) {
+	cu.findAll(ArrayAccessExpr.class).forEach(aae -> {
+		Expression expr = aae.getIndex();
+		ResolvedType resolvedTypeExpr;
+		try {
+		    resolvedTypeExpr = expr.calculateResolvedType();
+
+		    if (resolvedTypeExpr.describe().equals(UINT_TYPE))
+			aae.setIndex(new MethodCallExpr(expr, "asInt", new NodeList<Expression>()));
+		}
+		catch (Exception e) {}
+	    });
+
+	cu.findAll(ArrayCreationLevel.class).forEach(acl -> {
+		if (acl.getDimension().isPresent()) {
+		    Expression dim = acl.getDimension().get();
+
+		    acl.setDimension(new MethodCallExpr(dim, "asInt", new NodeList<Expression>()));
+		}
+	    });
+    }
+
     public static CompilationUnit refineTranslation(CompilationUnit cu) {
 	TypeSolver javaParserTypeSolver = new JavaParserTypeSolver(new File(PATH_TO_TYPES));
 	TypeSolver reflectionTypeSolver = new ReflectionTypeSolver();
@@ -70,6 +93,7 @@ public class SymbolSolver {
 
 	cu = JavaParser.parse(cu.toString());
 	correctAddressTransferMethod(cu);
+	correctArrayAccess(cu);
 	setDefaultValue(cu);
 
 	return cu;
