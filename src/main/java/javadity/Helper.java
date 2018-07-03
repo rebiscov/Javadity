@@ -18,6 +18,7 @@ import java.util.stream.*;
 
 public class Helper {
     public static final String UINT = "Uint256Int";
+    public static final int mappingSize = 50;
 
     public static ClassOrInterfaceType getUintType() {
 	return new ClassOrInterfaceType(null, UINT);

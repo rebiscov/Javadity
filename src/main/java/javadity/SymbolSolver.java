@@ -62,13 +62,10 @@ public class SymbolSolver {
 	cu.findAll(ArrayAccessExpr.class).forEach(aae -> {
 		Expression expr = aae.getIndex();
 		ResolvedType resolvedTypeExpr;
-		try {
-		    resolvedTypeExpr = expr.calculateResolvedType();
+		resolvedTypeExpr = expr.calculateResolvedType();
 
-		    if (resolvedTypeExpr.describe().equals(UINT_TYPE))
-			aae.setIndex(new MethodCallExpr(expr, "asInt", new NodeList<Expression>()));
-		}
-		catch (Exception e) {}
+		if (resolvedTypeExpr.describe().equals(UINT_TYPE))
+		    aae.setIndex(new MethodCallExpr(expr, "asInt", new NodeList<Expression>()));
 	    });
 
 	cu.findAll(ArrayCreationLevel.class).forEach(acl -> {
@@ -92,8 +89,10 @@ public class SymbolSolver {
 	JavaParser.getStaticConfiguration().setSymbolResolver(symbolSolver);
 
 	cu = JavaParser.parse(cu.toString());
-	correctAddressTransferMethod(cu);
 	correctArrayAccess(cu);
+	cu = JavaParser.parse(cu.toString());
+	correctAddressTransferMethod(cu);
+	cu = JavaParser.parse(cu.toString());
 	setDefaultValue(cu);
 
 	return cu;

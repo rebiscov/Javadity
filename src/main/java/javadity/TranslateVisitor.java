@@ -260,20 +260,32 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	if (ctx.expression() != null)
 	    expr = (Expression) this.visit(ctx.expression());
 
-	// If is is an array, initializes it
+	// If is is an array or a mapping, initializes it
 	else if (type.isArrayType()) {
 	    Type t = type.clone();
+
 	    NodeList<ArrayCreationLevel> dimensions = new NodeList<>();
 
 	    SolidityParser.TypeNameContext typeContext = ctx.typeName();
 
-	    // Get the dimensions
-	    while (t.isArrayType()) {
-		Expression dimension = (Expression) this.visit(typeContext.expression());
+	    // If it is a mapping...
+	    if (typeContext.mapping() != null) {
+		//dimensions.add(new ArrayCreationLevel(new IntegerLiteralExpr(Helper.mappingSize)));
+		NodeList<Expression> size = NodeList.nodeList(new IntegerLiteralExpr(Helper.mappingSize));
+		dimensions.add(new ArrayCreationLevel(new ObjectCreationExpr(null, Helper.getUintType(), size)));;
+		t = Helper.getUintType();
+	    }
 
-		dimensions.add(new ArrayCreationLevel(dimension));
-		t =  t.asArrayType().getComponentType();
-		typeContext = typeContext.typeName();
+	    // If it is an array
+	    else {
+		// Get the dimensions
+		while (t.isArrayType()) {
+		    Expression dimension = (Expression) this.visit(typeContext.expression());
+
+		    dimensions.add(new ArrayCreationLevel(dimension));
+		    t =  t.asArrayType().getComponentType();
+		    typeContext = typeContext.typeName();
+		}
 	    }
 	    expr = new ArrayCreationExpr(t, dimensions, null);
 	}
@@ -337,6 +349,17 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	// If it is not an array...
 	else
 	    return visitChildren(ctx);
+    }
+
+    @Override
+    public Node visitMapping(SolidityParser.MappingContext ctx) {
+	// For now we only handle mappings from addresses to uint or uint to uint
+	Type key = (Type) this.visit(ctx.elementaryTypeName());
+	Type value = (Type) this.visit(ctx.typeName());
+
+	// TODO: assertions
+
+	return new ArrayType(Helper.getUintType(), ArrayType.Origin.TYPE, new NodeList<AnnotationExpr>());
     }
 
     /* EXPRESSION */
