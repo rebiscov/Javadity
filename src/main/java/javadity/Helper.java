@@ -43,9 +43,6 @@ public class Helper {
     public static ExpressionStmt getCallToPayableModifier() {
 	NodeList<Expression> arguments = new NodeList<>();
 	arguments.add(new NameExpr("msg"));
-	arguments.add(new NameExpr("block"));
-	arguments.add(new NameExpr("tx"));
-
 	MethodCallExpr payable = new MethodCallExpr(null, "payable", arguments);
 
 	return new ExpressionStmt(payable);

@@ -6,6 +6,8 @@ import blockchain.Message;
 import blockchain.Transaction;
 
 import java.io.File;
+import java.util.List;
+import java.util.Arrays;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -26,9 +28,12 @@ public class SymbolSolver {
     public static final String PATH_TO_TYPES = "/home/vincent/Documents/M1/Internship/translator/javadity/src/main/java/javadity/";
     public static final String ADDRESS_TYPE = "blockchain.types.Address";
     public static final String UINT_TYPE = "blockchain.types.Uint256Int";
+    public static final List<String> UNINITIALIZED_VARIABLES = Arrays.asList(new String[] {"msg", "tx", "block"});
 
     private static void setDefaultValue(CompilationUnit cu) {
-	cu.findAll(VariableDeclarator.class).forEach(vd -> {
+	cu.findAll(VariableDeclarator.class).stream()
+	    .filter(elt -> !UNINITIALIZED_VARIABLES.contains(elt.getNameAsString()))
+	    .forEach(vd -> {
 		Type type = vd.getType();
 
 
@@ -66,6 +71,8 @@ public class SymbolSolver {
 
 		if (resolvedTypeExpr.describe().equals(UINT_TYPE))
 		    aae.setIndex(new MethodCallExpr(expr, "asInt", new NodeList<Expression>()));
+		else if (resolvedTypeExpr.describe().equals(ADDRESS_TYPE))
+		    aae.setIndex(new FieldAccessExpr(expr, "ID"));
 	    });
 
 	cu.findAll(ArrayCreationLevel.class).forEach(acl -> {
