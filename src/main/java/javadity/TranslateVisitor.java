@@ -359,7 +359,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	// TODO: assertions
 
-	return new ArrayType(Helper.getUintType(), ArrayType.Origin.TYPE, new NodeList<AnnotationExpr>());
+	return new ArrayType(value, ArrayType.Origin.TYPE, new NodeList<AnnotationExpr>());
     }
 
     /* EXPRESSION */

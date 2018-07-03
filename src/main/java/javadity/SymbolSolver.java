@@ -8,6 +8,7 @@ import blockchain.Transaction;
 import java.io.File;
 import java.util.List;
 import java.util.Arrays;
+import java.util.Collections;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -31,7 +32,9 @@ public class SymbolSolver {
     public static final List<String> UNINITIALIZED_VARIABLES = Arrays.asList(new String[] {"msg", "tx", "block"});
 
     private static void setDefaultValue(CompilationUnit cu) {
-	cu.findAll(VariableDeclarator.class).stream()
+	List<VariableDeclarator> nodeList = cu.findAll(VariableDeclarator.class);
+	Collections.reverse(nodeList);
+	nodeList.stream()
 	    .filter(elt -> !UNINITIALIZED_VARIABLES.contains(elt.getNameAsString()))
 	    .forEach(vd -> {
 		Type type = vd.getType();
@@ -47,7 +50,9 @@ public class SymbolSolver {
     }
 
     private static void correctAddressTransferMethod(CompilationUnit cu) {
-	cu.findAll(MethodCallExpr.class).forEach(mce -> {
+	List<MethodCallExpr> nodeList = cu.findAll(MethodCallExpr.class);
+	Collections.reverse(nodeList);
+	nodeList.forEach(mce -> {
 		if (mce.getScope().isPresent()) { // If the method call has a scope...
 		    Expression scope = mce.getScope().get();
 		    ResolvedType resolvedTypeScope = scope.calculateResolvedType();
@@ -64,7 +69,9 @@ public class SymbolSolver {
     }
 
     private static void correctArrayAccess(CompilationUnit cu) {
-	cu.findAll(ArrayAccessExpr.class).forEach(aae -> {
+	List<ArrayAccessExpr> nodeList = cu.findAll(ArrayAccessExpr.class);
+	Collections.reverse(nodeList);
+	nodeList.forEach(aae -> {
 		Expression expr = aae.getIndex();
 		ResolvedType resolvedTypeExpr;
 		resolvedTypeExpr = expr.calculateResolvedType();
@@ -74,8 +81,12 @@ public class SymbolSolver {
 		else if (resolvedTypeExpr.describe().equals(ADDRESS_TYPE))
 		    aae.setIndex(new FieldAccessExpr(expr, "ID"));
 	    });
+    }
 
-	cu.findAll(ArrayCreationLevel.class).forEach(acl -> {
+    private static void setArrayDimensions(CompilationUnit cu) {
+	List<ArrayCreationLevel> nodeList = cu.findAll(ArrayCreationLevel.class);
+	Collections.reverse(nodeList);
+	nodeList.forEach(acl -> {
 		if (acl.getDimension().isPresent()) {
 		    Expression dim = acl.getDimension().get();
 
@@ -97,8 +108,13 @@ public class SymbolSolver {
 
 	cu = JavaParser.parse(cu.toString());
 	correctArrayAccess(cu);
+
+	cu = JavaParser.parse(cu.toString());
+	setArrayDimensions(cu);
+
 	cu = JavaParser.parse(cu.toString());
 	correctAddressTransferMethod(cu);
+
 	cu = JavaParser.parse(cu.toString());
 	setDefaultValue(cu);
 
