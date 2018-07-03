@@ -273,7 +273,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 		//dimensions.add(new ArrayCreationLevel(new IntegerLiteralExpr(Helper.mappingSize)));
 		NodeList<Expression> size = NodeList.nodeList(new IntegerLiteralExpr(Helper.mappingSize));
 		dimensions.add(new ArrayCreationLevel(new ObjectCreationExpr(null, Helper.getUintType(), size)));;
-		t = Helper.getUintType();
+		t = t.asArrayType().getComponentType();
 	    }
 
 	    // If it is an array
