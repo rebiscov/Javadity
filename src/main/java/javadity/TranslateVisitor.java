@@ -452,6 +452,13 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	return new BinaryExpr(expr1, expr2, BinaryExpr.Operator.OR);
     }
 
+     @Override
+     public Node visitNotExpression(SolidityParser.NotExpressionContext ctx) {
+	 Expression expr = (Expression) this.visit(ctx.expression());
+
+	 return new UnaryExpr(expr, UnaryExpr.Operator.LOGICAL_COMPLEMENT);
+     }
+
     @Override
     public Node visitDotExpression(SolidityParser.DotExpressionContext ctx) {
 	// A dot expression is of the form expr.identifier
