@@ -18,18 +18,28 @@ import java.util.stream.*;
 import java.lang.RuntimeException;
 
 
-/*********************/
-/* TRANSLATE VISITOR */
-/*********************/
+/***********************/
+/** TRANSLATE VISITOR **/
+/***********************/
 
 public class TranslateVisitor extends SolidityBaseVisitor<Node> {
+    // Array containing all the necessary imports
     private static final String[] imports = {"blockchain.Block", "blockchain.Message", "blockchain.Transaction",
 					     "blockchain.types.Address", "blockchain.types.Uint256", "blockchain.types.Uint256Int"};
+
+    // The string containing the name of the type Uint256
     private static final String UINT = Helper.UINT;
+
+    // Name of the current contract (we need it to create the constructor of the contract)
     private String currentContractName;
+
+    // Mapping that keeps track of the type of some identifiers
     private HashMap<String, String> typesMap;
+
+    // List that stores the constructors of the structs
     private ArrayList<MethodDeclaration> structConstructors = new ArrayList<>();
-    
+
+    // Mapping from the name of a modifier to the Solidity AST of this modifier
     private HashMap<String, SolidityModifier> modifiersMap = new HashMap<>();
     
     @Override
@@ -906,6 +916,9 @@ class SolidityModifier {
 	this.parameters = parameters;
     }
 }
+
+
+/* Definition of some Exceptions */
 
 class UnsupportedTypeException extends RuntimeException {
 
