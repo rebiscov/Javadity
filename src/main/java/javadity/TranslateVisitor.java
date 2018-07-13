@@ -237,6 +237,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	// Add the struct constructor
 	structConstructors.stream()
 	    .forEach(elt -> type.addMember(elt));
+	structConstructors.clear();
 
 	return type;
     }
@@ -381,7 +382,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	int length = methodNameParts.length - 1;
 
 	// The name values are not supported
-	if (ctx.functionCallArguments() != null)
+	if (ctx.functionCallArguments().nameValueList() != null)
 	    throw new UnsupportedSolidityFeatureException("namevalue");
 
 	// Put all the arguments in the list (if there are some)
