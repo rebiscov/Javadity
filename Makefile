@@ -10,9 +10,6 @@ run:
 
 grammar:
 	$(ANTLR) $(SRC)/Solidity.g4 -visitor -no-listener
-	
+
 clean:
 	rm $(SRC)/*.tokens $(SRC)/*.interp
-
-clemacs:
-	rm $(SRC)/*~

@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.Collections;
 import java.util.regex.Pattern;
 import java.util.stream.*;
+import java.lang.RuntimeException;
 
 
 /*********************/
@@ -34,12 +35,12 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     @Override
     public Node visitSourceUnit(SolidityParser.SourceUnitContext ctx) {
 
-	// Create import declarations
+	// Create import declarations (import classes to simulate Solidity behaviour like Uint256 or Address)
 	NodeList<ImportDeclaration> importDeclarations = new NodeList<>();
 	for (String importDeclaration: imports)
 	    importDeclarations.add(new ImportDeclaration(importDeclaration, false, false));
 
-	
+
 	// Add all the contracts the list of contracts
 	NodeList contractsList = new NodeList(ctx.contractDefinition().stream() // for all contracts...
 					      .map(elt -> this.visit(elt)) //..translate them in Java
@@ -66,7 +67,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	// Get all the fields to put in the structure
 	List<SolidityParser.VariableDeclarationContext> fieldList = ctx.variableDeclaration();
 
-	// Method declaration for the constructor of the struct
+	// Method declaration for the constructor of the struct (here the constructor is a method of the contract that outputs a structure, it is not a method of the class representing the structure)
 	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PRIVATE);
 	ClassOrInterfaceType t = new ClassOrInterfaceType(null, structName);
 	MethodDeclaration constructor = new MethodDeclaration(modifiers, t, structName);
@@ -92,6 +93,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 								t,
 								new NodeList<Expression>());
 
+	// Create and define the struct object
 	VariableDeclarator structCreation = new VariableDeclarator(t,
 								   ret.toString(),
 								   initializer);
@@ -100,6 +102,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	
 	body.add(new ExpressionStmt(new VariableDeclarationExpr(structCreation)));
 
+	// Add the assignments of the elements of the struct
 	parameters.stream()
 	    .forEach(elt -> {
 		    FieldAccessExpr field = new FieldAccessExpr(ret, elt.getName().asString());
@@ -108,7 +111,8 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 		    
 		    body.add(new ExpressionStmt(assign));
 		});
-	
+
+	// Add the returned statement returning the struct
 	body.add(returnStmt);
 
 	constructor.setBody(new BlockStmt(body));
@@ -248,7 +252,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	if (!ctx.PublicKeyword().isEmpty())
 	    modifiers.add(Modifier.PUBLIC);
 	if (!ctx.PrivateKeyword().isEmpty() || !ctx.InternalKeyword().isEmpty())
-	    modifiers.add(Modifier.PUBLIC);
+	    modifiers.add(Modifier.PRIVATE);
 
 
 	// Identifier of the state variable
@@ -270,7 +274,6 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	    // If it is a mapping...
 	    if (typeContext.mapping() != null) {
-		//dimensions.add(new ArrayCreationLevel(new IntegerLiteralExpr(Helper.mappingSize)));
 		NodeList<Expression> size = NodeList.nodeList(new IntegerLiteralExpr(Helper.mappingSize));
 		dimensions.add(new ArrayCreationLevel(new ObjectCreationExpr(null, Helper.getUintType(), size)));;
 		t = t.asArrayType().getComponentType();
@@ -298,20 +301,22 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     
     @Override
     public Node visitElementaryTypeName(SolidityParser.ElementaryTypeNameContext ctx) {
-	// RE-DO THIS PLEASE!
 
-	if (ctx.Int() != null || ctx.Uint() != null)
-	    return new ClassOrInterfaceType(null, UINT);
-	
+	// For now, we consider all unsigned integers to be uint256
+	if (ctx.Uint() != null)
+	    return Helper.getUintType();
+
 	switch (ctx.getText()) {
 	case "address":
-	    return new ClassOrInterfaceType(null, "Address");
+	    return Helper.getAddressType();
 	case "bool":
 	    return PrimitiveType.booleanType();
 	case "string":
 	    return new ClassOrInterfaceType(null, "String");
+	case "bytes32": // For now, bytes32 are implemented as Uint256
+	    return Helper.getUintType();
 	default:
-	    return new ClassOrInterfaceType(null, UINT);
+	    throw new UnsupportedTypeException(ctx.getText());
 
 	}
     }
@@ -353,11 +358,12 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitMapping(SolidityParser.MappingContext ctx) {
-	// For now we only handle mappings from addresses to uint or uint to uint
+	// For now we only handle mappings from addresses to uint or from uint to uint
 	Type key = (Type) this.visit(ctx.elementaryTypeName());
 	Type value = (Type) this.visit(ctx.typeName());
 
-	// TODO: assertions
+	if (! (key.asString().equals(UINT) || key.asString().equals("Address")))
+	    throw new UnsupportedMappingTypeException(key.asString());
 
 	return new ArrayType(value, ArrayType.Origin.TYPE, new NodeList<AnnotationExpr>());
     }
@@ -367,12 +373,16 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     @Override
     public Node visitFunctionCallExpression(SolidityParser.FunctionCallExpressionContext ctx) {
 	NodeList<Expression> arguments = new NodeList<>(); // List to store the arguments
-	
+
 	// Get the name of the method
 	NameExpr method = (NameExpr) this.visit(ctx.expression());
 
 	String[] methodNameParts = method.toString().split(Pattern.quote("."));
 	int length = methodNameParts.length - 1;
+
+	// The name values are not supported
+	if (ctx.functionCallArguments() != null)
+	    throw new UnsupportedSolidityFeatureException("namevalue");
 
 	// Put all the arguments in the list (if there are some)
 
@@ -380,16 +390,10 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    ctx.functionCallArguments().expressionList().expression().stream()
 		.forEach(elt -> arguments.add((Expression) this.visit(elt)));
 	}
-	catch (Exception e) { // If it is not an expression list, it my be a nameValue list
-	    try {
-		ctx.functionCallArguments().nameValueList().nameValue().stream()
-		    .forEach(elt -> arguments.add((Expression) this.visit(elt.expression())));
-	    }
-	    catch (Exception f) {}
-	}
+	catch (java.lang.NullPointerException e) {}
 
 
-	
+
 	// Return the method call
 	return new MethodCallExpr(null, method.getName(), arguments);
     }
@@ -497,7 +501,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	return this.visitChildren(ctx);
     }
 
-    
+
     @Override
     public Node visitCompExpression(SolidityParser.CompExpressionContext ctx) {
 	Expression expr1 = (Expression) this.visit(ctx.expression(0));
@@ -556,36 +560,39 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
     @Override
     public Node visitConstructorDefinition (SolidityParser.ConstructorDefinitionContext ctx) {
+	// Get the name of the contract to define the Java constructor
 	String id = currentContractName;
 
-	// Modifiers TODO: implement all modifiers
+	// Set modifiers
 	EnumSet modifiers = EnumSet.of(Modifier.PUBLIC); // Default is public
 	SolidityParser.ModifierListContext modList = ctx.modifierList();
 
 	if (!modList.PrivateKeyword().isEmpty() || !modList.InternalKeyword().isEmpty())
 	    modifiers = EnumSet.of(Modifier.PRIVATE);
-	
-	// Parameters list
+
+	// Get the parameters
 	List<SolidityParser.ParameterContext> solParameterList = ctx.parameterList().parameter();
 	NodeList<Parameter> javaParameterList = new NodeList<>();
 	solParameterList.stream()
 	    .forEach(elt -> javaParameterList.add((Parameter) this.visit(elt)));
 
-	// MethodDeclaration
+	// Create the constructor declaration
 	ConstructorDeclaration method = new ConstructorDeclaration(modifiers, id);
 	method.setParameters(javaParameterList);
+
+	// Set the exceptions that can be thrown
 	NodeList<ReferenceType> exceptions = NodeList.nodeList(new ClassOrInterfaceType(null, "Exception"));
 	method.setThrownExceptions(exceptions);
 
 	// User defined modifiers
 	BlockStmt block = (BlockStmt) this.visit(ctx.block());
-	
+
 	List<SolidityParser.ModifierInvocationContext> modifierInvocations = ctx.modifierList().modifierInvocation();
 	Collections.reverse(modifierInvocations);
-	
+
 	for (SolidityParser.ModifierInvocationContext mod: modifierInvocations) {
 	    String name = mod.identifier().getText();
-	    
+
 	    List<String> params;
 	    try {
 		params = new ArrayList(mod.expressionList().expression().stream()
@@ -610,11 +617,11 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	    block = (BlockStmt) modVisitor.visit(solMod.code);
 	}
 
-	
+
 	// Set block
 	method.setBody(block);
-	
-	
+
+
 	return method;
     }
     
@@ -638,13 +645,13 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	BlockStmt block = (BlockStmt) this.visit(ctx.block());
 
 	// User defined modifiers
-	
+
 	List<SolidityParser.ModifierInvocationContext> modifierInvocations = ctx.modifierList().modifierInvocation();
 	Collections.reverse(modifierInvocations);
-	
+
 	for (SolidityParser.ModifierInvocationContext mod: modifierInvocations) {
 	    String name = mod.identifier().getText();
-	    
+
 	    List<String> params;
 	    try {
 		params = new ArrayList(mod.expressionList().expression().stream()
@@ -676,7 +683,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 		.filter(elt -> elt.PayableKeyword() != null)
 		.forEach(elt -> statements.addFirst(Helper.getCallToPayableModifier()));
 	}
-	catch (Exception e) {}
+	catch (java.lang.NullPointerException e) {}
 
 	// Parameters list
 	List<SolidityParser.ParameterContext> solParameterList = ctx.parameterList().parameter();
@@ -697,15 +704,15 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	}
 
 
-	// MethodDeclaration
+	// Create the declaration of the method
 	MethodDeclaration method = new MethodDeclaration(modifiers, id, returnedType, javaParameterList);
 	NodeList<ReferenceType> exceptions = NodeList.nodeList(new ClassOrInterfaceType(null, "Exception"));
 	method.setThrownExceptions(exceptions);
 
 	// Set block
 	method.setBody(block);
-	
-	
+
+
 	return method;
     }
 
@@ -896,5 +903,26 @@ class SolidityModifier {
 	this.name = name;
 	this.code = code;
 	this.parameters = parameters;
+    }
+}
+
+class UnsupportedTypeException extends RuntimeException {
+
+    UnsupportedTypeException(String type) {
+	super("The type " + type + " is not supported.");
+    }
+}
+
+class UnsupportedMappingTypeException extends RuntimeException {
+
+    UnsupportedMappingTypeException(String type) {
+	super("The type " + type + " cannot be used as the key type in a mapping.");
+    } 
+}
+
+class UnsupportedSolidityFeatureException extends RuntimeException {
+
+    UnsupportedSolidityFeatureException(String feature) {
+	super("The Solidity feature " + feature + " is not supported.");
     }
 }
