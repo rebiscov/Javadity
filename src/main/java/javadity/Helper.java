@@ -80,7 +80,7 @@ public class Helper {
 	Parameter msg = new Parameter(getMessageType(), "_msg");
 	Parameter block = new Parameter(getBlockType(), "_block");
 	Parameter tx = new Parameter(getTransactionType(), "_tx");
-	
+
 	parameters.add(msg);
 	parameters.add(block);
 	parameters.add(tx);	
@@ -91,7 +91,7 @@ public class Helper {
 	NodeList<Expression> arguments = new NodeList<>();
 	arguments.add(new NameExpr(msg.getName()));
 	arguments.add(new NameExpr(block.getName()));
-	arguments.add(new NameExpr(tx.getName()));	
+	arguments.add(new NameExpr(tx.getName()));
 
 	// updateBlockchainVariables
 	NodeList<Statement> statements = new NodeList<>();
@@ -104,7 +104,12 @@ public class Helper {
 	    .forEach(elt ->
 		     arguments.add(new NameExpr(elt.getName())));
 
-	ExpressionStmt call = new ExpressionStmt(new MethodCallExpr(null, method.getName().asString(), arguments));
+	Statement call = null;
+
+	if (method.getType().asString().equals("void"))
+	    call = new ExpressionStmt(new MethodCallExpr(null, method.getName().asString(), arguments));
+	else
+	    call = new ReturnStmt(new MethodCallExpr(null, method.getName().asString(), arguments));
 
 	// TryCatch
 	BlockStmt tryBlock = new BlockStmt(NodeList.nodeList(call));
@@ -116,7 +121,7 @@ public class Helper {
 	TryStmt tryStmt = new TryStmt(tryBlock, NodeList.nodeList(catchClause), null);
 
 	statements.add(tryStmt);
-	
+
 	callable.setBody(new BlockStmt(statements));
 
 	return callable;
