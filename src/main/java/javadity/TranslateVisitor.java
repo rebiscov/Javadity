@@ -25,7 +25,7 @@ import java.lang.RuntimeException;
 public class TranslateVisitor extends SolidityBaseVisitor<Node> {
     // Array containing all the necessary imports
     private static final String[] imports = {"blockchain.Block", "blockchain.Message", "blockchain.Transaction",
-					     "blockchain.types.Address", "blockchain.types.Uint256", "blockchain.types.Uint256Int"};
+					     "blockchain.types.Address", "blockchain.types.Uint256", "blockchain.types.Uint256Int", "blockchain.types.Crypto"};
 
     // The string containing the name of the type Uint256
     private static final String UINT = Helper.UINT;
@@ -82,7 +82,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	ClassOrInterfaceType t = new ClassOrInterfaceType(null, structName);
 	MethodDeclaration constructor = new MethodDeclaration(modifiers, t, structName);
 	NodeList<Parameter> parameters = new NodeList<>();
-	
+
 	// Add the fields to the class 
 	fieldList.stream()
 	    .forEach(elt -> {
@@ -214,7 +214,6 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 
 	// Add the members
 	type.addMember(Helper.getRequire());
-	type.addMember(Helper.getKeccak());
 	type.addMember(Helper.getSelfdestruct());
 	type.addMember(Helper.getUpdateBlockchainVariables());
 
@@ -491,7 +490,7 @@ public class TranslateVisitor extends SolidityBaseVisitor<Node> {
 	// We treat only integers TODO: use NumberUnit and HexNumber (see grammar)
 
 	// The type is Uint256
-	ClassOrInterfaceType type = new ClassOrInterfaceType(null, UINT);
+	ClassOrInterfaceType type = Helper.getUintTypeIntImplem();
 
 	// Get the Integer
 	NodeList<Expression> integer =

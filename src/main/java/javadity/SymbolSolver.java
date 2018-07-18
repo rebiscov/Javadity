@@ -33,6 +33,9 @@ public class SymbolSolver {
 	    .forEach(vd -> {
 		Type type = vd.getType();
 
+		if (type.asString().equals("Uint256"))
+		    type = Helper.getUintTypeIntImplem();
+
 
 		// If there is no initialization for a non-primitive type, add a default one
 		if (!vd.getInitializer().isPresent() && !type.isPrimitiveType()) {
@@ -89,6 +92,14 @@ public class SymbolSolver {
 	    });
     }
 
+    private static void crypto(CompilationUnit cu) {
+	List<MethodCallExpr> nodeList = cu.findAll(MethodCallExpr.class);
+	Collections.reverse(nodeList);
+	nodeList.stream()
+	    .filter(mce -> mce.getName().asString().equals("keccak256"))
+	    .forEach(mce -> mce.setScope(new NameExpr("Crypto")));
+    }
+
     public static CompilationUnit refineTranslation(CompilationUnit cu) {
 	TypeSolver javaParserTypeSolver = null;
 	try {
@@ -118,6 +129,9 @@ public class SymbolSolver {
 
 	cu = JavaParser.parse(cu.toString());
 	setDefaultValue(cu);
+
+	cu = JavaParser.parse(cu.toString());
+	crypto(cu);
 
 	return cu;
     }

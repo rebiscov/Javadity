@@ -17,12 +17,17 @@ import java.util.regex.Pattern;
 import java.util.stream.*;
 
 public class Helper {
-    public static final String UINT = "Uint256Int";
+    public static final String UINT = "Uint256";
     public static final int mappingSize = 50;
 
     public static ClassOrInterfaceType getUintType() {
 	return new ClassOrInterfaceType(null, UINT);
     }
+
+    public static ClassOrInterfaceType getUintTypeIntImplem() {
+	return new ClassOrInterfaceType(null, "Uint256Int");
+    }
+
 
     public static ClassOrInterfaceType getAddressType() {
 	return new ClassOrInterfaceType(null, "Address");
@@ -121,6 +126,8 @@ public class Helper {
 	TryStmt tryStmt = new TryStmt(tryBlock, NodeList.nodeList(catchClause), null);
 
 	statements.add(tryStmt);
+	if (!method.getType().asString().equals("void"))
+	    statements.add(new ReturnStmt(new NullLiteralExpr()));
 
 	callable.setBody(new BlockStmt(statements));
 
