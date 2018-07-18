@@ -8,4 +8,4 @@ It is highly recommended that you use [Maven](https://maven.apache.org/). To ins
 
 ## Run
 
-Once compiled, you can easily run some test by doing `make run EX=aSolidityFile.sol`. Otherwise run `java javadity-X.Y-SNAPSHOT.jar --help` for more information.
+Once compiled, you can easily run some test by doing `make run EX=aSolidityFile.sol`. Otherwise run `java -jar javadity-X.Y-SNAPSHOT.jar --help` for more information.
