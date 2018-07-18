@@ -16,6 +16,8 @@ import java.util.Collections;
 import java.util.regex.Pattern;
 import java.util.stream.*;
 
+// The Helper class has mostly static methods that outputs often used Java code (for example the Uint256 type, or the require function)
+
 public class Helper {
     public static final String UINT = "Uint256";
     public static final int mappingSize = 50;
@@ -78,6 +80,7 @@ public class Helper {
 	return updateBlockchainVars;
     }
 
+    // Returns the function that can be called from outside (it creates a new message, see Translation_details.md)
     public static MethodDeclaration getFunctionCallable(MethodDeclaration method) {
 	EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
 	NodeList<Parameter> parameters = new NodeList<>(method.getParameters());

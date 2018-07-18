@@ -18,13 +18,14 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeS
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JarTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 
+// The class SymbolSolver allows the user to make some corrections to the Java AST using, for example, a symbol solver (this is not mandatory).
 
 public class SymbolSolver {
-    public static final String PATH_TO_TYPES = ".";
     public static final String ADDRESS_TYPE = "blockchain.types.Address";
     public static final String UINT_TYPE = "blockchain.types.Uint256Int";
-    public static final List<String> UNINITIALIZED_VARIABLES = Arrays.asList(new String[] {"msg", "tx", "block"});
+    public static final List<String> UNINITIALIZED_VARIABLES = Arrays.asList(new String[] {"msg", "tx", "block"}); // List of variables that must not be initialized
 
+    // Add a default value to all the non-primitive, non-initialized variables (the goal is to have a behaviour as close as in Solidity)
     private static void setDefaultValue(CompilationUnit cu) {
 	List<VariableDeclarator> nodeList = cu.findAll(VariableDeclarator.class);
 	Collections.reverse(nodeList);
@@ -46,6 +47,8 @@ public class SymbolSolver {
 	    });
     }
 
+    // The transfer method in Solidity takes several implicit arguments (the block variable, the transaction variable etc...) and we need to make this explicit in Java
+    // Note that a transfer in Solidity is an external call the the fallback function of the recipient
     private static void correctAddressTransferMethod(CompilationUnit cu) {
 	List<MethodCallExpr> nodeList = cu.findAll(MethodCallExpr.class);
 	Collections.reverse(nodeList);
@@ -65,6 +68,7 @@ public class SymbolSolver {
 	    });
     }
 
+    // The index of an array access can be an Address or an Uint256 once the visitor made the translation, we need to convert these values to integers
     private static void correctArrayAccess(CompilationUnit cu) {
 	List<ArrayAccessExpr> nodeList = cu.findAll(ArrayAccessExpr.class);
 	Collections.reverse(nodeList);
@@ -80,6 +84,8 @@ public class SymbolSolver {
 	    });
     }
 
+    // Array initialization in Solidity and in Java does not work the same way leading to a incorrect translation of the visitor
+    // (when translating a declaration into Java, the initial size is omitted by the visitor)
     private static void setArrayDimensions(CompilationUnit cu) {
 	List<ArrayCreationLevel> nodeList = cu.findAll(ArrayCreationLevel.class);
 	Collections.reverse(nodeList);
@@ -92,6 +98,7 @@ public class SymbolSolver {
 	    });
     }
 
+    // The keccak function in Java is in a file Crypto.java, thus all call keccak256(expr) must be translated in Crypto.keccak(expr)
     private static void crypto(CompilationUnit cu) {
 	List<MethodCallExpr> nodeList = cu.findAll(MethodCallExpr.class);
 	Collections.reverse(nodeList);
