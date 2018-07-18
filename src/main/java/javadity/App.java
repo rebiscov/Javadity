@@ -5,6 +5,11 @@ import java.nio.file.*;
 
 import java.io.File;
 
+import net.sourceforge.argparse4j.ArgumentParsers;
+import net.sourceforge.argparse4j.inf.ArgumentParser;
+import net.sourceforge.argparse4j.inf.ArgumentParserException;
+import net.sourceforge.argparse4j.inf.Namespace;
+
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.expr.*;
@@ -19,27 +24,40 @@ import com.github.javaparser.ast.CompilationUnit;
 
 public class App {
     public static void main(String[] args) throws Exception {
-	assert(args.length > 0);
+	ArgumentParser argparser = ArgumentParsers.newFor("Javadity").build()
+	    .defaultHelp(true)
+	    .description("A Solidity to Java translator.");
 
-	 CharStream input = CharStreams.fromFileName(args[0]);
-	 SolidityLexer lexer = new SolidityLexer(input);
-	 CommonTokenStream tokens = new CommonTokenStream(lexer);
-	 SolidityParser parser = new SolidityParser(tokens);
+	argparser.addArgument("file")
+	    .help("Solidity file containing the contracts to translate");
 
-	 ParseTree tree = parser.sourceUnit();
-	 TranslateVisitor visitor = new TranslateVisitor();
+	argparser.addArgument("--dst", "-d")
+	    .help("Destination file")
+	    .setDefault("NoName.java");
 
-	 CompilationUnit cu = (CompilationUnit) visitor.visit(tree);
+	Namespace ns = null;
 
-	 cu = SymbolSolver.refineTranslation(cu);
+	try {
+            ns = argparser.parseArgs(args);
+        } catch (ArgumentParserException e) {
+            argparser.handleError(e);
+            System.exit(1);
+        }
 
-	 
-	 Path file;
-	 if (args.length > 1)
-	     file = Paths.get(args[0]);
-	 else
-	     file = Paths.get("NoName.java");
-	 
-	 Files.write(file, cu.toString().getBytes());
+	CharStream input = CharStreams.fromFileName(ns.getString("file"));
+	SolidityLexer lexer = new SolidityLexer(input);
+	CommonTokenStream tokens = new CommonTokenStream(lexer);
+	SolidityParser parser = new SolidityParser(tokens);
+
+	ParseTree tree = parser.sourceUnit();
+	TranslateVisitor visitor = new TranslateVisitor();
+
+	CompilationUnit cu = (CompilationUnit) visitor.visit(tree);
+
+	cu = SymbolSolver.refineTranslation(cu);
+
+	Path file = Paths.get(ns.getString("dst"));
+
+	Files.write(file, cu.toString().getBytes());
     }
 }

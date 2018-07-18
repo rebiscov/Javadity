@@ -15,11 +15,12 @@ import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.model.resolution.TypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.JarTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 
 
 public class SymbolSolver {
-    public static final String PATH_TO_TYPES = "/home/vincent/Documents/M1/Internship/translator/javadity/src/main/java/javadity/";
+    public static final String PATH_TO_TYPES = ".";
     public static final String ADDRESS_TYPE = "blockchain.types.Address";
     public static final String UINT_TYPE = "blockchain.types.Uint256Int";
     public static final List<String> UNINITIALIZED_VARIABLES = Arrays.asList(new String[] {"msg", "tx", "block"});
@@ -89,7 +90,14 @@ public class SymbolSolver {
     }
 
     public static CompilationUnit refineTranslation(CompilationUnit cu) {
-	TypeSolver javaParserTypeSolver = new JavaParserTypeSolver(new File(PATH_TO_TYPES));
+	TypeSolver javaParserTypeSolver = null;
+	try {
+	    javaParserTypeSolver = new JarTypeSolver(SymbolSolver.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
+	}
+	catch (Exception e) {
+	    System.out.println(e);
+	    System.exit(1);
+	}
 	TypeSolver reflectionTypeSolver = new ReflectionTypeSolver();
 
 	CombinedTypeSolver combined = new CombinedTypeSolver();

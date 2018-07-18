@@ -7,6 +7,6 @@ src/main/java/javadity/Solidity*
 *.xml
 *.class
 src/main/java/javadity/Test*
-blockchain
+./blockchain
 map
 Casino.java
